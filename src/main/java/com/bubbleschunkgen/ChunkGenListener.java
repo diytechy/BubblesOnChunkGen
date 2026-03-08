@@ -3,10 +3,10 @@ package com.bubbleschunkgen;
 import org.bukkit.Chunk;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
-import org.bukkit.block.BlockState;
+import org.bukkit.block.data.BlockData;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.world.ChunkPopulateEvent;
+import org.bukkit.event.world.ChunkLoadEvent;
 
 public class ChunkGenListener implements Listener {
 
@@ -21,8 +21,14 @@ public class ChunkGenListener implements Listener {
     }
 
     @EventHandler
-    public void onChunkPopulate(ChunkPopulateEvent event) {
+    public void onChunkLoad(ChunkLoadEvent event) {
+        if (!event.isNewChunk()) return;
+
         Chunk chunk = event.getChunk();
+
+        if (plugin.isDebug()) {
+            plugin.getLogger().info("New chunk detected: [" + chunk.getX() + ", " + chunk.getZ() + "]");
+        }
 
         // Delay by a few ticks to ensure all generation stages are complete
         plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
@@ -31,8 +37,8 @@ public class ChunkGenListener implements Listener {
     }
 
     private void triggerBubbleColumns(Chunk chunk) {
-        int baseX = chunk.getX() << 4;
-        int baseZ = chunk.getZ() << 4;
+        int updateCount = 0;
+        int soulSandCount = 0;
 
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
@@ -40,15 +46,24 @@ public class ChunkGenListener implements Listener {
                     Block block = chunk.getBlock(x, y, z);
                     if (block.getType() != Material.SOUL_SAND) continue;
 
+                    soulSandCount++;
                     Block above = chunk.getBlock(x, y + 1, z);
                     if (above.getType() != Material.WATER) continue;
 
-                    // Trigger a block state update on the water block to
-                    // cause Minecraft to recognize the bubble column
-                    BlockState state = above.getState();
-                    state.update(true, true);
+                    // Force a block update by re-setting the soul_sand block
+                    // This triggers Minecraft's neighbor update logic which
+                    // creates bubble columns in the water above
+                    BlockData data = block.getBlockData();
+                    block.setBlockData(data, true);
+                    updateCount++;
                 }
             }
+        }
+
+        if (plugin.isDebug()) {
+            plugin.getLogger().info("Chunk [" + chunk.getX() + ", " + chunk.getZ()
+                    + "] - soul_sand found: " + soulSandCount
+                    + ", updates triggered: " + updateCount);
         }
     }
 }
