@@ -3,6 +3,7 @@ package com.bubbleschunkgen;
 import org.bukkit.Chunk;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockState;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -33,7 +34,7 @@ public class ChunkGenListener implements Listener {
         // Delay by a few ticks to ensure all generation stages are complete
         plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
             triggerBubbleColumns(chunk);
-        }, 5L);
+        }, 10L);
     }
 
     private void triggerBubbleColumns(Chunk chunk) {
@@ -47,6 +48,8 @@ public class ChunkGenListener implements Listener {
                     if (block.getType() != Material.SOUL_SAND) continue;
 
                     soulSandCount++;
+
+                    if (updateCount > 16) continue;
                     Block above = chunk.getBlock(x, y + 1, z);
                     if (above.getType() != Material.WATER) continue;
 
