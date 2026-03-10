@@ -20,10 +20,6 @@ public class ChunkGenListener implements Listener {
     // Global counter for total blocks changed across all chunks (while debug is on)
     private int globalUpdateCount = 0;
 
-    // Strategy counter - cycles through strategies per block
-    private int strategyCounter = 0;
-    private static final int STRATEGY_COUNT = 5;
-
     public ChunkGenListener(BubblesPlugin plugin) {
         this.plugin = plugin;
     }
@@ -53,52 +49,21 @@ public class ChunkGenListener implements Listener {
                 // Iterate top-to-bottom; break on first soul_sand match per column
                 for (int y = MAX_Y; y >= MIN_Y; y--) {
                     Block block = chunk.getBlock(x, y, z);
-                    if (block.getType() != Material.SOUL_SAND) continue;
+                    if (block.getType() != Material.BLUE_CONCRETE) continue;
 
                     soulSandCount++;
 
-                    if (updateCount > 16) break;
+                    if (updateCount > 40) break;
                     Block above = chunk.getBlock(x, y + 1, z);
                     if (above.getType() != Material.WATER) break;
 
-                    int strategy = strategyCounter % STRATEGY_COUNT;
-                    strategyCounter++;
-
-                    switch (strategy) {
-                        case 0:
-                            // Strategy 1: Re-set the BlockData to trigger neighbor update
-                            block.setBlockData(block.getBlockData(), true);
-                            break;
-                        case 1:
-                            // Strategy 2: Use BlockState.update(force, applyPhysics)
-                            BlockState state = block.getState();
-                            state.update(true, true);
-                            break;
-                        case 2:
-                            // Strategy 3: Replace soul_sand with magma block (visual test)
-                            block.setType(Material.MAGMA_BLOCK);
-                            break;
-                        case 3:
-                            // Strategy 4: Manually place BUBBLE_COLUMN in water above
-                            for (int by = y + 1; by <= MAX_Y; by++) {
-                                Block waterBlock = chunk.getBlock(x, by, z);
-                                if (waterBlock.getType() != Material.WATER) break;
-                                waterBlock.setType(Material.BUBBLE_COLUMN, true);
-                            }
-                            break;
-                        case 4:
-                            // Strategy 5: Remove soul_sand then re-place it to force
-                            // a full block change event (not just data update)
-                            block.setType(Material.STONE, false);
-                            block.setType(Material.SOUL_SAND, true);
-                            break;
-                    }
+                    //block.setType(Material.SOUL_SAND, true);
+                    block.setType(Material.SOUL_SAND);
 
                     updateCount++;
 
                     if (plugin.isDebug()) {
-                        plugin.getLogger().info("  Applied strategy " + strategy
-                                + " at [" + block.getX() + ", " + y + ", " + block.getZ() + "]");
+                        plugin.getLogger().info("  Applied replacement  at [" + block.getX() + ", " + y + ", " + block.getZ() + "]");
                     }
 
                     break; // move to next x/z column
@@ -109,7 +74,7 @@ public class ChunkGenListener implements Listener {
         if (plugin.isDebug()) {
             globalUpdateCount += updateCount;
             plugin.getLogger().info("Chunk [" + chunk.getX() + ", " + chunk.getZ()
-                    + "] - soul_sand found: " + soulSandCount
+                    + "] - blue_concrete found: " + soulSandCount
                     + ", updates triggered: " + updateCount
                     + ", global total: " + globalUpdateCount);
         }
