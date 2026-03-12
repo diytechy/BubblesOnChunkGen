@@ -74,7 +74,6 @@ public class ChunkGenListener implements Listener {
 
                     //block.setType(Material.SOUL_SAND, true);
                     block.setType(Material.SOUL_SAND);
-
                     updateCount++;
 
                     if (plugin.isDebug()) {
@@ -90,13 +89,9 @@ public class ChunkGenListener implements Listener {
                 }
             }
         }
-
         if (plugin.isDebug()) {
             globalUpdateCount += updateCount;
-            plugin.getLogger().info("Chunk [" + chunk.getX() + ", " + chunk.getZ()
-                    + "] - blue_concrete found: " + soulSandCount
-                    + ", updates triggered: " + updateCount
-                    + ", global total: " + globalUpdateCount);
+            plugin.getLogger().info("Total sandstone added: " + globalUpdateCount);
         }
     }
 
