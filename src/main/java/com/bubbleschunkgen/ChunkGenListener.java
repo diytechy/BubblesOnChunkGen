@@ -52,7 +52,7 @@ public class ChunkGenListener implements Listener {
         // Delay by a few ticks to ensure all generation stages are complete
         plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
             triggerBubbleColumns(chunk);
-        }, 10L);
+        }, 5L);
     }
 
     private void triggerBubbleColumns(Chunk chunk) {
@@ -68,7 +68,7 @@ public class ChunkGenListener implements Listener {
 
                     soulSandCount++;
 
-                    if (updateCount > 40) break;
+                    if (updateCount > 60) break;
                     Block above = chunk.getBlock(x, y + 1, z);
                     if (above.getType() != Material.WATER) break;
 
@@ -76,12 +76,12 @@ public class ChunkGenListener implements Listener {
                     block.setType(Material.SOUL_SAND);
                     updateCount++;
 
-                    if (plugin.isDebug()) {
-                        plugin.getLogger().info("  Applied replacement  at [" + block.getX() + ", " + y + ", " + block.getZ() + "]");
-                    }
+                    //if (plugin.isDebug()) {
+                    //    plugin.getLogger().info("  Applied replacement  at [" + block.getX() + ", " + y + ", " + block.getZ() + "]");
+                    //}
 
                     // 1 in 500 chance: place a dedication chest on an adjacent side
-                    if (random.nextInt(500) == 0) {
+                    if (random.nextInt(1000) == 0) {
                         tryPlaceDedicationChest(chunk, x, y, z);
                     }
 
@@ -120,22 +120,27 @@ public class ChunkGenListener implements Listener {
         Block chestBlock = chunk.getBlock(chosen[0], y, chosen[1]);
         chestBlock.setType(Material.CHEST);
 
-        Chest chest = (Chest) chestBlock.getState();
-        Inventory inv = chest.getInventory();
+        // Delay 1 tick so the chest's tile entity is fully initialized before
+        // we populate it — writing to the inventory immediately after setType()
+        // can silently fail because the TileEntityChest hasn't been registered yet.
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+            if (chestBlock.getType() != Material.CHEST) return; // safety check
 
-        // --- Dedication note ---
-        ItemStack book = new ItemStack(Material.WRITTEN_BOOK);
-        BookMeta meta = (BookMeta) book.getItemMeta();
-        meta.setTitle("CHIMERA");
-        meta.setAuthor("CHIMERA");
-        meta.addPage("CHIMERA\n\nDedicated to Finnian and Armin");
-        book.setItemMeta(meta);
+            Chest chest = (Chest) chestBlock.getState();
+            Inventory inv = chest.getInventory();
 
-        inv.setItem(0, book);
-        inv.setItem(1, new ItemStack(Material.EMERALD, 6));
-        inv.setItem(2, new ItemStack(Material.DIAMOND, 7));
+            // --- Dedication note ---
+            ItemStack book = new ItemStack(Material.WRITTEN_BOOK);
+            BookMeta meta = (BookMeta) book.getItemMeta();
+            meta.setTitle("CHIMERA");
+            meta.setAuthor("CHIMERA");
+            meta.addPage("CHIMERA\n\nDedicated to Finnian and Armin");
+            book.setItemMeta(meta);
 
-        chest.update();
+            inv.setItem(0, book);
+            inv.setItem(1, new ItemStack(Material.EMERALD, 6));
+            inv.setItem(2, new ItemStack(Material.DIAMOND, 7));
+        }, 1L);
 
         if (plugin.isDebug()) {
             plugin.getLogger().info("[CHIMERA DEDICATION] Chest placed at world ["
