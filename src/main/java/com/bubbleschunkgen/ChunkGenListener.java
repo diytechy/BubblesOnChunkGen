@@ -274,8 +274,8 @@ public class ChunkGenListener implements Listener {
             if (nx < 0 || nx > 15 || nz < 0 || nz > 15) continue;
             Block side = chunk.getBlock(nx, y, nz);
             Material sideType = side.getType();
-            if (sideType != Material.AIR && sideType != Material.WATER
-                    && sideType != Material.CAVE_AIR) continue;
+            // Reject soul sand and blue concrete (other bubble columns)
+            if (sideType == Material.SOUL_SAND || sideType == Material.BLUE_CONCRETE) continue;
             // Reject if the block above is solid (chest would be buried)
             Block aboveSide = chunk.getBlock(nx, y + 1, nz);
             if (aboveSide.getType().isSolid()) continue;
