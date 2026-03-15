@@ -134,15 +134,14 @@ public class ChunkGenListener implements Listener {
 
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
-                for (int y = MAX_Y; y >= MIN_Y; y--) {
+                for (int y = MIN_Y; y <= MAX_Y; y++) {
                     Block block = chunk.getBlock(x, y, z);
                     if (block.getType() != Material.BLUE_CONCRETE) continue;
 
                     Block above = chunk.getBlock(x, y + 1, z);
-                    if (above.getType() != Material.WATER) break;
+                    if (above.getType() != Material.WATER) continue;
 
                     count += registerSurfaceAbove(chunk, ck, x, y, z);
-                    break;
                 }
             }
         }
@@ -153,31 +152,37 @@ public class ChunkGenListener implements Listener {
     }
 
     /**
-     * For an existing chunk, find the barrier+soul_sand signature and register
-     * the water surface above each column.
+     * For an existing chunk, find the bedrock signature and register
+     * the water surface above each column. If soul sand above the bedrock
+     * has been removed (griefing), restore it.
      */
     private void registerSurfacesFromExistingChunk(Chunk chunk) {
         long ck = chunkKey(chunk.getX(), chunk.getZ());
         int count = 0;
+        int restored = 0;
 
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
-                for (int y = MAX_Y; y >= MIN_Y; y--) {
+                for (int y = MIN_Y - 1; y <= MAX_Y; y++) {
                     Block block = chunk.getBlock(x, y, z);
-                    if (block.getType() != Material.SOUL_SAND) continue;
+                    if (block.getType() != Material.BEDROCK) continue;
 
-                    Block below = chunk.getBlock(x, y - 1, z);
-                    if (below.getType() != Material.BARRIER) continue;
+                    // Bedrock found — check the block above
+                    Block above = chunk.getBlock(x, y + 1, z);
+                    if (above.getType() != Material.SOUL_SAND) {
+                        // Soul sand was removed (griefed) — restore it
+                        above.setType(Material.SOUL_SAND);
+                        restored++;
+                    }
 
-                    count += registerSurfaceAbove(chunk, ck, x, y, z);
-                    break;
+                    count += registerSurfaceAbove(chunk, ck, x, y + 1, z);
                 }
             }
         }
 
-        if (plugin.isDebug() && count > 0) {
+        if (plugin.isDebug() && (count > 0 || restored > 0)) {
             plugin.getLogger().info("Loaded chunk [" + chunk.getX() + ", " + chunk.getZ()
-                    + "]: registered " + count + " surface block(s) for water flow prevention");
+                    + "]: registered " + count + " surface(s), restored " + restored + " soul sand");
         }
     }
 
@@ -213,7 +218,7 @@ public class ChunkGenListener implements Listener {
     // ---- Block replacement (runs on delayed tick) ----
 
     /**
-     * New chunk: replace blue concrete with soul sand + barrier below.
+     * New chunk: replace blue concrete with soul sand + bedrock below.
      * Surface registration has already happened in the chunk load event.
      */
     private void processNewChunk(Chunk chunk) {
@@ -221,17 +226,17 @@ public class ChunkGenListener implements Listener {
 
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
-                for (int y = MAX_Y; y >= MIN_Y; y--) {
+                for (int y = MIN_Y; y <= MAX_Y; y++) {
                     Block block = chunk.getBlock(x, y, z);
                     if (block.getType() != Material.BLUE_CONCRETE) continue;
 
                     if (updateCount > 60) break;
                     Block above = chunk.getBlock(x, y + 1, z);
-                    if (above.getType() != Material.WATER) break;
+                    if (above.getType() != Material.WATER) continue;
 
-                    // Place barrier below for future identification, then soul sand
+                    // Place bedrock below for future identification, then soul sand
                     Block below = chunk.getBlock(x, y - 1, z);
-                    below.setType(Material.BARRIER);
+                    below.setType(Material.BEDROCK);
                     block.setType(Material.SOUL_SAND);
                     updateCount++;
 
@@ -239,8 +244,6 @@ public class ChunkGenListener implements Listener {
                     if (random.nextInt(1000) == 0) {
                         tryPlaceDedicationChest(chunk, x, y, z);
                     }
-
-                    break; // move to next x/z column
                 }
             }
         }
