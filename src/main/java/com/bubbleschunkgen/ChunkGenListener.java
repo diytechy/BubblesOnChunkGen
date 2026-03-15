@@ -6,6 +6,7 @@ import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
 import org.bukkit.block.Chest;
 import org.bukkit.block.data.BlockData;
+import org.bukkit.block.data.Levelled;
 import org.bukkit.block.data.type.Chest.Type;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -193,9 +194,16 @@ public class ChunkGenListener implements Listener {
             // This is the surface — block water flow here
             addBlockedSurface(ck, block.getX(), y, block.getZ());
 
+            // Place a shallow (level 3) water block for a visual step in the river.
+            // The BlockFromToEvent handler prevents it from flowing.
+            block.setType(Material.WATER, false);
+            Levelled waterData = (Levelled) block.getBlockData();
+            waterData.setLevel(3);
+            block.setBlockData(waterData, false);
+
             if (plugin.isDebug()) {
                 plugin.getLogger().info("  Blocking water flow at [" + block.getX()
-                        + ", " + y + ", " + block.getZ() + "]");
+                        + ", " + y + ", " + block.getZ() + "] (level-3 water placed)");
             }
             return 1;
         }
@@ -256,10 +264,13 @@ public class ChunkGenListener implements Listener {
             int nz = z + offset[1];
             if (nx < 0 || nx > 15 || nz < 0 || nz > 15) continue;
             Block side = chunk.getBlock(nx, y, nz);
-            if (side.getType() == Material.AIR || side.getType() == Material.WATER
-                    || side.getType() == Material.CAVE_AIR) {
-                candidates.add(new int[]{nx, nz});
-            }
+            Material sideType = side.getType();
+            if (sideType != Material.AIR && sideType != Material.WATER
+                    && sideType != Material.CAVE_AIR) continue;
+            // Reject if the block above is solid (chest would be buried)
+            Block aboveSide = chunk.getBlock(nx, y + 1, nz);
+            if (aboveSide.getType().isSolid()) continue;
+            candidates.add(new int[]{nx, nz});
         }
 
         if (candidates.isEmpty()) return;
