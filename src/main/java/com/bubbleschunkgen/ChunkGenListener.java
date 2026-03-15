@@ -194,7 +194,13 @@ public class ChunkGenListener implements Listener {
         for (int y = startY + 1; y <= MAX_Y; y++) {
             Block block = chunk.getBlock(x, y, z);
             Material type = block.getType();
-            if (type == Material.WATER || type == Material.BUBBLE_COLUMN) continue;
+            // Skip only full source water (level 0) and bubble columns.
+            // Partial water (e.g. the level-3 block we place) counts as the surface.
+            if (type == Material.BUBBLE_COLUMN) continue;
+            if (type == Material.WATER) {
+                Levelled data = (Levelled) block.getBlockData();
+                if (data.getLevel() == 0) continue;
+            }
 
             // This is the surface — block water flow here
             addBlockedSurface(ck, block.getX(), y, block.getZ());
