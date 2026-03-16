@@ -191,34 +191,64 @@ public class ChunkGenListener implements Listener {
      * then registers that coordinate as blocked. Returns 1 if registered, 0 otherwise.
      */
     private int registerSurfaceAbove(Chunk chunk, long ck, int x, int startY, int z) {
+        int worldX = chunk.getX() * 16 + x;
+        int worldZ = chunk.getZ() * 16 + z;
+        int count = 0;
+        boolean reachedSurface = false;
+
         for (int y = startY + 1; y <= MAX_Y; y++) {
             Block block = chunk.getBlock(x, y, z);
             Material type = block.getType();
-            // Skip only full source water (level 0) and bubble columns.
-            // Partial water (e.g. the level-3 block we place) counts as the surface.
-            if (type == Material.BUBBLE_COLUMN) continue;
-            if (type == Material.WATER) {
-                Levelled data = (Levelled) block.getBlockData();
-                if (data.getLevel() == 0) continue;
+
+            if (!reachedSurface) {
+                // Skip only full source water (level 0) and bubble columns.
+                // Partial water (e.g. the level-3 block we place) counts as the surface.
+                if (type == Material.BUBBLE_COLUMN) continue;
+                if (type == Material.WATER) {
+                    Levelled data = (Levelled) block.getBlockData();
+                    if (data.getLevel() == 0) continue;
+                }
+                reachedSurface = true;
             }
 
-            // This is the surface — block water flow here
-            addBlockedSurface(ck, block.getX(), y, block.getZ());
+            // Check if any horizontal neighbor at this y level is water
+            if (!hasAdjacentWater(chunk, x, y, z)) break;
 
-            // Place a shallow (level 3) water block for a visual step in the river.
-            // The BlockFromToEvent handler prevents it from flowing.
+            // Block water flow at this level
+            addBlockedSurface(ck, worldX, y, worldZ);
+            count++;
+
+            // Place a shallow (level 3) water block for a visual step
             block.setType(Material.WATER, false);
             Levelled waterData = (Levelled) block.getBlockData();
             waterData.setLevel(3);
             block.setBlockData(waterData, false);
 
             if (plugin.isDebug()) {
-                plugin.getLogger().info("  Blocking water flow at [" + block.getX()
-                        + ", " + y + ", " + block.getZ() + "] (level-3 water placed)");
+                plugin.getLogger().info("  Blocking water flow at [" + worldX
+                        + ", " + y + ", " + worldZ + "] (level-3 water placed)");
             }
-            return 1;
         }
-        return 0;
+        return count;
+    }
+
+    /** Returns true if any of the 4 horizontal neighbors at (x, y, z) is a water block. */
+    private boolean hasAdjacentWater(Chunk chunk, int x, int y, int z) {
+        for (int[] offset : SIDE_OFFSETS) {
+            int nx = x + offset[0];
+            int nz = z + offset[1];
+            // For blocks at chunk edges, use world lookup
+            Block neighbor;
+            if (nx < 0 || nx > 15 || nz < 0 || nz > 15) {
+                neighbor = chunk.getWorld().getBlockAt(
+                        chunk.getX() * 16 + nx, y, chunk.getZ() * 16 + nz);
+            } else {
+                neighbor = chunk.getBlock(nx, y, nz);
+            }
+            Material nType = neighbor.getType();
+            if (nType == Material.WATER || nType == Material.BUBBLE_COLUMN) return true;
+        }
+        return false;
     }
 
     // ---- Block replacement (runs on delayed tick) ----
