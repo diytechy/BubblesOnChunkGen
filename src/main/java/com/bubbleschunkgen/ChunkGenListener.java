@@ -47,6 +47,10 @@ public class ChunkGenListener implements Listener {
     private final Set<Long> allBlockedSurfaces = new HashSet<>();
     private final Map<Long, List<Long>> blockedByChunk = new HashMap<>();
 
+    // Chunks currently being generated — ALL water flow in/out of these chunks is frozen
+    // until processNewChunk completes and the chunk key is removed.
+    private final Set<Long> pendingNewChunks = new HashSet<>();
+
     public ChunkGenListener(BubblesPlugin plugin) {
         this.plugin = plugin;
     }
@@ -78,17 +82,30 @@ public class ChunkGenListener implements Listener {
         Chunk chunk = event.getChunk();
 
         if (event.isNewChunk()) {
+            long ck = chunkKey(chunk.getX(), chunk.getZ());
+
             if (plugin.isDebug()) {
                 plugin.getLogger().info("New chunk detected: [" + chunk.getX() + ", " + chunk.getZ() + "]");
             }
 
-            // Register blocked surfaces immediately from blue concrete markers,
-            // before generation is fully complete — this blocks water flow right away.
-            registerSurfacesFromNewChunk(chunk);
+            // Freeze ALL water flow in/out of this chunk immediately.
+            // This must happen before any physics tick to prevent water from
+            // flowing past bubble column surfaces during chunk generation.
+            pendingNewChunks.add(ck);
 
             // Delay the actual block replacements so all generation stages finish first.
+            // Once done, register per-coordinate surface blocks and lift the chunk freeze.
             plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
                 processNewChunk(chunk);
+                // Blue concrete is now soul sand + bedrock — use the same
+                // registration logic as existing chunk loads.
+                registerSurfacesFromExistingChunk(chunk);
+                pendingNewChunks.remove(ck);
+
+                if (plugin.isDebug()) {
+                    plugin.getLogger().info("Chunk [" + chunk.getX() + ", " + chunk.getZ()
+                            + "] processing complete, chunk-wide freeze lifted");
+                }
             }, 5L);
         } else {
             // Existing chunk: scan for barrier+soul_sand pattern immediately
@@ -99,6 +116,7 @@ public class ChunkGenListener implements Listener {
     @EventHandler
     public void onChunkUnload(ChunkUnloadEvent event) {
         long ck = chunkKey(event.getChunk().getX(), event.getChunk().getZ());
+        pendingNewChunks.remove(ck);
         List<Long> coords = blockedByChunk.remove(ck);
         if (coords != null) {
             allBlockedSurfaces.removeAll(coords);
@@ -106,50 +124,34 @@ public class ChunkGenListener implements Listener {
     }
 
     /**
-     * Cancel water flow into or out of any blocked surface coordinate.
+     * Cancel water flow into or out of any blocked surface coordinate,
+     * and blanket-block all water flow involving chunks still being generated.
      */
     @EventHandler(ignoreCancelled = true)
     public void onWaterFlow(BlockFromToEvent event) {
-        if (allBlockedSurfaces.isEmpty()) return;
-
         Block from = event.getBlock();
         Block to = event.getToBlock();
 
-        if (allBlockedSurfaces.contains(coordKey(to.getX(), to.getY(), to.getZ()))
-                || allBlockedSurfaces.contains(coordKey(from.getX(), from.getY(), from.getZ()))) {
-            event.setCancelled(true);
-        }
-    }
-
-    // ---- Surface registration (runs immediately, no tick delay) ----
-
-    /**
-     * For a new chunk, find blue concrete markers and register the water surface
-     * above each one. This runs synchronously in the chunk load event so water
-     * flow is blocked before physics can tick.
-     */
-    private void registerSurfacesFromNewChunk(Chunk chunk) {
-        long ck = chunkKey(chunk.getX(), chunk.getZ());
-        int count = 0;
-
-        for (int x = 0; x < 16; x++) {
-            for (int z = 0; z < 16; z++) {
-                for (int y = MIN_Y; y <= MAX_Y; y++) {
-                    Block block = chunk.getBlock(x, y, z);
-                    if (block.getType() != Material.BLUE_CONCRETE) continue;
-
-                    Block above = chunk.getBlock(x, y + 1, z);
-                    if (above.getType() != Material.WATER) continue;
-
-                    count += registerSurfaceAbove(chunk, ck, x, y, z);
-                }
+        // Blanket freeze: block ALL water flow in/out of chunks still being generated
+        if (!pendingNewChunks.isEmpty()) {
+            long fromCk = chunkKey(from.getX() >> 4, from.getZ() >> 4);
+            long toCk = chunkKey(to.getX() >> 4, to.getZ() >> 4);
+            if (pendingNewChunks.contains(fromCk) || pendingNewChunks.contains(toCk)) {
+                event.setCancelled(true);
+                return;
             }
         }
 
-        if (plugin.isDebug() && count > 0) {
-            plugin.getLogger().info("  Registered " + count + " surface block(s) for water flow prevention");
+        // Per-coordinate blocking for processed chunks
+        if (!allBlockedSurfaces.isEmpty()) {
+            if (allBlockedSurfaces.contains(coordKey(to.getX(), to.getY(), to.getZ()))
+                    || allBlockedSurfaces.contains(coordKey(from.getX(), from.getY(), from.getZ()))) {
+                event.setCancelled(true);
+            }
         }
     }
+
+    // ---- Surface registration ----
 
     /**
      * For an existing chunk, find the bedrock signature and register
@@ -255,7 +257,7 @@ public class ChunkGenListener implements Listener {
 
     /**
      * New chunk: replace blue concrete with soul sand + bedrock below.
-     * Surface registration has already happened in the chunk load event.
+     * Surface registration happens after this method in the scheduled task.
      */
     private void processNewChunk(Chunk chunk) {
         int updateCount = 0;
