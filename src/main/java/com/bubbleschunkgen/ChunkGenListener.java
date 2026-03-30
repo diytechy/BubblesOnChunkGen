@@ -2,6 +2,7 @@ package com.bubbleschunkgen;
 
 import org.bukkit.Chunk;
 import org.bukkit.Material;
+import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
 import org.bukkit.block.Chest;
@@ -14,6 +15,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockFromToEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.event.world.ChunkUnloadEvent;
+import org.bukkit.generator.ChunkGenerator;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.BookMeta;
@@ -25,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.UUID;
 
 public class ChunkGenListener implements Listener {
 
@@ -51,8 +54,20 @@ public class ChunkGenListener implements Listener {
     // until processNewChunk completes and the chunk key is removed.
     private final Set<Long> pendingNewChunks = new HashSet<>();
 
+    // Cache per-world whether it uses Terra's chunk generator.
+    private final Map<UUID, Boolean> terraWorldCache = new HashMap<>();
+
     public ChunkGenListener(BubblesPlugin plugin) {
         this.plugin = plugin;
+    }
+
+    /** Returns true if the world uses a Terra chunk generator. */
+    private boolean isTerraWorld(World world) {
+        return terraWorldCache.computeIfAbsent(world.getUID(), uid -> {
+            ChunkGenerator gen = world.getGenerator();
+            return gen != null
+                    && gen.getClass().getName().toLowerCase().contains("terra");
+        });
     }
 
     // ---- Coordinate packing utilities ----
@@ -80,6 +95,7 @@ public class ChunkGenListener implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onChunkLoad(ChunkLoadEvent event) {
         Chunk chunk = event.getChunk();
+        if (!isTerraWorld(chunk.getWorld())) return;
 
         if (event.isNewChunk()) {
             long ck = chunkKey(chunk.getX(), chunk.getZ());
@@ -115,6 +131,7 @@ public class ChunkGenListener implements Listener {
 
     @EventHandler
     public void onChunkUnload(ChunkUnloadEvent event) {
+        if (!isTerraWorld(event.getChunk().getWorld())) return;
         long ck = chunkKey(event.getChunk().getX(), event.getChunk().getZ());
         pendingNewChunks.remove(ck);
         List<Long> coords = blockedByChunk.remove(ck);
@@ -129,6 +146,7 @@ public class ChunkGenListener implements Listener {
      */
     @EventHandler(ignoreCancelled = true)
     public void onWaterFlow(BlockFromToEvent event) {
+        if (!isTerraWorld(event.getBlock().getWorld())) return;
         Block from = event.getBlock();
         Block to = event.getToBlock();
 
