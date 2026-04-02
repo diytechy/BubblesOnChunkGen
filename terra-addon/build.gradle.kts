@@ -1,5 +1,6 @@
 plugins {
     id("com.gradleup.shadow") version "9.4.1"
+    `maven-publish`
 }
 
 repositories {
@@ -44,4 +45,29 @@ tasks.processResources {
     filesMatching("terra.addon.yml") {
         expand(mapOf("version" to project.version))
     }
+}
+
+publishing {
+    repositories {
+        mavenLocal()
+        maven {
+            name = "Repsy"
+            url = uri("https://repo.repsy.io/mvn/diytechy/bubbleschunkgen")
+            credentials {
+                username = project.findProperty("repsy.user") as String? ?: System.getenv("REPSY_USERNAME")
+                password = project.findProperty("repsy.key") as String? ?: System.getenv("REPSY_PASSWORD")
+            }
+        }
+    }
+    publications {
+        create<MavenPublication>("repsy") {
+            artifact(tasks.shadowJar)
+            groupId = rootProject.group.toString()
+            artifactId = "bubbleschunkgen-terra-addon"
+        }
+    }
+}
+
+tasks.named("build") {
+    finalizedBy(tasks.named("publishToMavenLocal"))
 }
