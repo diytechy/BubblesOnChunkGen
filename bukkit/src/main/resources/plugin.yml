@@ -1,6 +1,6 @@
 name: BubblesOnChunkGen
 version: '${version}'
-main: com.bubbleschunkgen.BubblesPlugin
+main: com.bubbleschunkgen.bukkit.BukkitPlugin
 api-version: '1.21'
 description: Triggers block updates on soul_sand under water after chunk generation to create bubble columns.
 commands:

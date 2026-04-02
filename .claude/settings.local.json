@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(find ~/.gradle/caches -name fabric-lifecycle-events-v1* -name *.jar)"
+    ]
+  }
+}

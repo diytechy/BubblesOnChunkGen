@@ -3,26 +3,25 @@ plugins {
 }
 
 group = "com.bubbleschunkgen"
-version = "1.0.0"
+version = "1.1.0"
 
-repositories {
-    mavenCentral()
-    maven {
-        name = "papermc"
-        url = uri("https://repo.papermc.io/repository/maven-public/")
+subprojects {
+    apply(plugin = "java")
+
+    group = rootProject.group
+    version = rootProject.version
+
+    java {
+        toolchain {
+            languageVersion.set(JavaLanguageVersion.of(21))
+        }
     }
-}
 
-dependencies {
-    compileOnly("io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT")
-}
-
-java {
-    toolchain {
-        languageVersion.set(JavaLanguageVersion.of(21))
+    repositories {
+        mavenCentral()
     }
-}
 
-tasks.jar {
-    archiveBaseName.set("BubblesOnChunkGen")
+    tasks.withType<JavaCompile> {
+        options.encoding = "UTF-8"
+    }
 }

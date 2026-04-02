@@ -1,0 +1,8 @@
+schema-version: 1
+contributors:
+  - BubblesOnChunkGen Contributors
+id: bubbles-chunk-gen
+version: ${version}
+entrypoints:
+  - "com.bubbleschunkgen.terra.BubblesTerraAddon"
+license: MIT

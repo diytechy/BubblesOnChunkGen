@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "bubbleschunkgen",
+  "version": "${version}",
+  "name": "BubblesOnChunkGen",
+  "description": "Triggers block updates on soul_sand under water after chunk generation to create bubble columns.",
+  "license": "MIT",
+  "environment": "server",
+  "entrypoints": {
+    "server": [
+      "com.bubbleschunkgen.fabric.FabricMod"
+    ]
+  },
+  "mixins": [
+    "bubbleschunkgen.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.18.0",
+    "fabric-api": "*",
+    "minecraft": ">=26.1"
+  }
+}

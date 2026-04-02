@@ -1,0 +1,33 @@
+package com.bubbleschunkgen.forge.mixin;
+
+import com.bubbleschunkgen.common.FlowBlocker;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.FlowingFluid;
+import net.minecraft.world.level.material.FluidState;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+@Mixin(FlowingFluid.class)
+public class FlowableFluidMixin {
+
+    @Inject(method = "spreadTo", at = @At("HEAD"), cancellable = true)
+    private void bubbles$onSpreadTo(LevelAccessor level, BlockPos pos, BlockState blockState,
+                                     Direction direction, FluidState fluidState, CallbackInfo ci) {
+        FlowBlocker blocker = FlowBlocker.getGlobalInstance();
+        if (blocker == null) return;
+
+        // The 'pos' is the target position where fluid is spreading TO.
+        // We also need to check the source position (pos offset by opposite direction).
+        BlockPos fromPos = pos.relative(direction.getOpposite());
+        if (blocker.shouldBlockFlow(
+                fromPos.getX(), fromPos.getY(), fromPos.getZ(),
+                pos.getX(), pos.getY(), pos.getZ())) {
+            ci.cancel();
+        }
+    }
+}

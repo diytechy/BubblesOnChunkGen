@@ -1,1 +1,15 @@
-When new chunks are getting generated, water appears to be flowing past the soulsand / bubble columns, and the level 3 water appears to be placed above the newly generated soulsand.  This implies the plugin is not making the updates to block the flow until after the water has already flowed through the location and generated a new source water block before the plugin has even gone through and blocked the flow patterns from occuring.  Is this a timing issue?  Is there something that needs to be done to pause water flow on the entire chunk until it is scanned and appropriate locks are registered?  This is on paper minecraft, which may have other apis available in addition to what is offered through bukkit.
+Can you investigate a method to convert this bukkit / paper plugin to instead be a Terra addon?  Terra source code is at "https://github.com/PolyhedralDev/Terra", with a local copy at "C:\Projects\Terra" and a Terra addon at "C:\Projects\DendryTerra".
+
+This may not work at all anyways, as it seems just generating the chunk with soulsand (and no physics updates) will not produce a bubble column in the water above.
+
+#####################################################
+
+Approach B sounds like a good choice.  Can we update the project to just build multiple sets?  Make a plan so that there are multiple artifacts from this repository:
+
+Build:
+A jar for bukkit / paper (Ideally supporting both 1.21.11 and 26.1)
+A jar for Forge  https://github.com/MinecraftForge/MinecraftForge (Ideally supporting both 1.21.11 and 26.1)
+Fabric: https://github.com/FabricMC/fabric-api (Ideally supporting both 1.21.11 and 26.1)
+An addon for Terra that would also work directly with Terra and the platforms above.
+
+In all cases there should be clear errors / warnings for dependencies or issues while loading the plugin or addon.  If Terra loads with this addon first, the respective plugin should not load with a reason, and vice-versa.

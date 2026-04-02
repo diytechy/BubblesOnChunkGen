@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.bubbleschunkgen.forge.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "FlowableFluidMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
