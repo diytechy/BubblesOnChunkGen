@@ -7,6 +7,8 @@ import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.Chest;
 import org.bukkit.block.data.Levelled;
+import org.bukkit.command.CommandMap;
+import org.bukkit.command.CommandSender;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -18,6 +20,8 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.BookMeta;
 import org.bukkit.plugin.Plugin;
 
+import java.lang.reflect.Field;
+import java.util.List;
 import java.util.logging.Logger;
 
 import static com.bubbleschunkgen.common.BubblesConstants.*;
@@ -98,6 +102,37 @@ public class BukkitTerraHandler implements Listener {
 
         logic = new BubblesLogic(bridge, flowBlocker);
         Bukkit.getPluginManager().registerEvents(this, hostPlugin);
+        registerDebugCommand(bridge);
+    }
+
+    private void registerDebugCommand(PlatformBridge bridge) {
+        try {
+            Field commandMapField = Bukkit.getServer().getClass().getDeclaredField("commandMap");
+            commandMapField.setAccessible(true);
+            CommandMap commandMap = (CommandMap) commandMapField.get(Bukkit.getServer());
+
+            org.bukkit.command.Command cmd = new org.bukkit.command.Command(
+                    "bubblesdebug",
+                    "Toggle debug logging for BubblesOnChunkGen",
+                    "/bubblesdebug",
+                    List.of()) {
+                @Override
+                public boolean execute(CommandSender sender, String label, String[] args) {
+                    if (!sender.isOp()) {
+                        sender.sendMessage("You don't have permission to use this command.");
+                        return true;
+                    }
+                    bridge.setDebug(!bridge.isDebug());
+                    sender.sendMessage("BubblesOnChunkGen debug " + (bridge.isDebug() ? "ENABLED" : "DISABLED"));
+                    return true;
+                }
+            };
+
+            commandMap.register("bubbleschunkgen", cmd);
+        } catch (Exception e) {
+            Logger.getLogger("BubblesOnChunkGen").warning(
+                    "Failed to register /bubblesdebug command: " + e.getMessage());
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)

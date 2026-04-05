@@ -13,3 +13,7 @@ Fabric: https://github.com/FabricMC/fabric-api (Ideally supporting both 1.21.11 
 An addon for Terra that would also work directly with Terra and the platforms above.
 
 In all cases there should be clear errors / warnings for dependencies or issues while loading the plugin or addon.  If Terra loads with this addon first, the respective plugin should not load with a reason, and vice-versa.
+
+###############################
+
+Can we actually make a compile time option to switch between 1.21.11 and 26.1?  This option 
