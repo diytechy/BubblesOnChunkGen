@@ -1,9 +1,11 @@
 package com.bubbleschunkgen.terra.platform;
 
 import com.bubbleschunkgen.common.*;
+import com.dfsek.terra.bukkit.generator.BukkitChunkGeneratorWrapper;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Material;
+import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.Chest;
 import org.bukkit.block.data.Levelled;
@@ -21,7 +23,10 @@ import org.bukkit.inventory.meta.BookMeta;
 import org.bukkit.plugin.Plugin;
 
 import java.lang.reflect.Field;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.logging.Logger;
 
 import static com.bubbleschunkgen.common.BubblesConstants.*;
@@ -33,6 +38,7 @@ import static com.bubbleschunkgen.common.BubblesConstants.*;
 public class BukkitTerraHandler implements Listener {
 
     private final FlowBlocker flowBlocker = new FlowBlocker();
+    private final Map<UUID, Boolean> chimeraWorldCache = new HashMap<>();
     private BubblesLogic logic;
     private boolean debug = false;
     private Plugin hostPlugin;
@@ -135,8 +141,17 @@ public class BukkitTerraHandler implements Listener {
         }
     }
 
+    private boolean isChimeraWorld(World world) {
+        return chimeraWorldCache.computeIfAbsent(world.getUID(), uid -> {
+            if (!(world.getGenerator() instanceof BukkitChunkGeneratorWrapper wrapper)) return false;
+            String fullId = wrapper.getPack().getRegistryKey().toString();
+            return fullId.toLowerCase().contains("chimera");
+        });
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onChunkLoad(ChunkLoadEvent event) {
+        if (!isChimeraWorld(event.getChunk().getWorld())) return;
         BukkitBlockAccess access = new BukkitBlockAccess(event.getChunk());
         if (event.isNewChunk()) {
             logic.onNewChunkLoad(access);
@@ -147,12 +162,14 @@ public class BukkitTerraHandler implements Listener {
 
     @EventHandler
     public void onChunkUnload(ChunkUnloadEvent event) {
+        if (!isChimeraWorld(event.getChunk().getWorld())) return;
         Chunk chunk = event.getChunk();
         logic.onChunkUnload(chunk.getX(), chunk.getZ());
     }
 
     @EventHandler(ignoreCancelled = true)
     public void onWaterFlow(BlockFromToEvent event) {
+        if (!isChimeraWorld(event.getBlock().getWorld())) return;
         Block from = event.getBlock();
         Block to = event.getToBlock();
         if (flowBlocker.shouldBlockFlow(
