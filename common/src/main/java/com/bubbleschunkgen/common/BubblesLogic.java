@@ -1,6 +1,7 @@
 package com.bubbleschunkgen.common;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 
@@ -42,7 +43,7 @@ public class BubblesLogic {
 
         bridge.runDelayed(() -> {
             processNewChunk(chunk);
-            registerSurfacesFromExistingChunk(chunk);
+            if (PROCESS_EXISTING_CHUNKS) registerSurfacesFromExistingChunk(chunk);
             flowBlocker.removePendingChunk(ck);
 
             if (bridge.isDebug()) {
@@ -57,6 +58,7 @@ public class BubblesLogic {
      * Scans for bedrock signatures and registers water surfaces.
      */
     public void onExistingChunkLoad(BlockAccess chunk) {
+        if (!PROCESS_EXISTING_CHUNKS) return;
         registerSurfacesFromExistingChunk(chunk);
     }
 
@@ -69,10 +71,12 @@ public class BubblesLogic {
     }
 
     /**
-     * Replace blue concrete markers with soul sand + bedrock signature.
+     * Replace blue concrete markers with soul sand (+ optional bedrock signature).
+     * Collects all placed positions then attempts a single dedication chest at the end.
      */
     private void processNewChunk(BlockAccess chunk) {
         int updateCount = 0;
+        List<int[]> soulSandPlaced = new ArrayList<>();
 
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
@@ -81,16 +85,22 @@ public class BubblesLogic {
                     if (updateCount > MAX_UPDATES_PER_CHUNK) break;
                     if (chunk.getBlockType(x, y + 1, z) != BLOCK_WATER) continue;
 
-                    // Place bedrock below for future identification, then soul sand
-                    chunk.setBlockType(x, y - 1, z, BLOCK_BEDROCK, false);
+                    if (PLACE_BEDROCK_SIGNATURE) {
+                        chunk.setBlockType(x, y - 1, z, BLOCK_BEDROCK, false);
+                    }
                     chunk.setBlockType(x, y, z, BLOCK_SOUL_SAND, true);
                     updateCount++;
-
-                    // 1 in 1000 chance: place a dedication chest on an adjacent side
-                    if (random.nextInt(1000) == 0) {
-                        tryPlaceDedicationChest(chunk, x, y, z);
-                    }
+                    soulSandPlaced.add(new int[]{x, y, z});
                 }
+            }
+        }
+
+        // 1 in 100 chance per chunk to place a single dedication chest.
+        // Shuffle so every column gets a fair shot before we give up.
+        if (!soulSandPlaced.isEmpty() && random.nextInt(100) == 0) {
+            Collections.shuffle(soulSandPlaced, random);
+            for (int[] pos : soulSandPlaced) {
+                if (tryPlaceDedicationChest(chunk, pos[0], pos[1], pos[2])) break;
             }
         }
 
@@ -194,21 +204,22 @@ public class BubblesLogic {
     }
 
     /**
-     * Attempts to place a dedication chest on one of the 4 horizontal sides.
+     * Attempts to place a dedication chest on one of the 4 horizontal sides of the
+     * given soul sand position. Any adjacent block except soul sand and bedrock is
+     * a valid candidate. Returns true if a chest was placed.
      */
-    private void tryPlaceDedicationChest(BlockAccess chunk, int x, int y, int z) {
+    private boolean tryPlaceDedicationChest(BlockAccess chunk, int x, int y, int z) {
         List<int[]> candidates = new ArrayList<>();
         for (int[] offset : SIDE_OFFSETS) {
             int nx = x + offset[0];
             int nz = z + offset[1];
             if (nx < 0 || nx > 15 || nz < 0 || nz > 15) continue;
             int sideType = chunk.getBlockType(nx, y, nz);
-            if (sideType == BLOCK_SOUL_SAND || sideType == BLOCK_BLUE_CONCRETE) continue;
-            if (chunk.isSolid(nx, y + 1, nz)) continue;
+            if (sideType == BLOCK_SOUL_SAND || sideType == BLOCK_BEDROCK) continue;
             candidates.add(new int[]{nx, nz});
         }
 
-        if (candidates.isEmpty()) return;
+        if (candidates.isEmpty()) return false;
 
         int[] chosen = candidates.get(random.nextInt(candidates.size()));
         chunk.setBlockType(chosen[0], y, chosen[1], BLOCK_CHEST, false);
@@ -227,5 +238,6 @@ public class BubblesLogic {
                     + "] adjacent to soul_sand in chunk ["
                     + chunk.getChunkX() + ", " + chunk.getChunkZ() + "]");
         }
+        return true;
     }
 }

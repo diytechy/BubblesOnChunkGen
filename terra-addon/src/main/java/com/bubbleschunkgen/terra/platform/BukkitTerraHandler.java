@@ -1,7 +1,6 @@
 package com.bubbleschunkgen.terra.platform;
 
 import com.bubbleschunkgen.common.*;
-import com.dfsek.terra.bukkit.generator.BukkitChunkGeneratorWrapper;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Material;
@@ -112,10 +111,26 @@ public class BukkitTerraHandler implements Listener {
     }
 
     private void registerDebugCommand(PlatformBridge bridge) {
+        Logger log = Logger.getLogger("BubblesOnChunkGen");
         try {
-            Field commandMapField = Bukkit.getServer().getClass().getDeclaredField("commandMap");
-            commandMapField.setAccessible(true);
-            CommandMap commandMap = (CommandMap) commandMapField.get(Bukkit.getServer());
+            // Walk the class hierarchy - commandMap may be on a superclass
+            CommandMap commandMap = null;
+            Class<?> clazz = Bukkit.getServer().getClass();
+            while (clazz != null) {
+                try {
+                    Field f = clazz.getDeclaredField("commandMap");
+                    f.setAccessible(true);
+                    commandMap = (CommandMap) f.get(Bukkit.getServer());
+                    break;
+                } catch (NoSuchFieldException e) {
+                    clazz = clazz.getSuperclass();
+                }
+            }
+
+            if (commandMap == null) {
+                log.warning("[Bubbles] Could not find commandMap - /bubblesdebug will not be available.");
+                return;
+            }
 
             org.bukkit.command.Command cmd = new org.bukkit.command.Command(
                     "bubblesdebug",
@@ -135,17 +150,32 @@ public class BukkitTerraHandler implements Listener {
             };
 
             commandMap.register("bubbleschunkgen", cmd);
+
+            // Sync with Paper's Brigadier layer so the command is recognised by clients
+            try {
+                Bukkit.getServer().getClass().getMethod("syncCommands").invoke(Bukkit.getServer());
+            } catch (Exception ignored) {
+                // Not a Paper server or method unavailable - command still works via legacy dispatch
+            }
+
+            log.info("[Bubbles] Registered /bubblesdebug command.");
         } catch (Exception e) {
-            Logger.getLogger("BubblesOnChunkGen").warning(
-                    "Failed to register /bubblesdebug command: " + e.getMessage());
+            log.warning("[Bubbles] Failed to register /bubblesdebug command: " + e);
         }
     }
 
     private boolean isChimeraWorld(World world) {
         return chimeraWorldCache.computeIfAbsent(world.getUID(), uid -> {
-            if (!(world.getGenerator() instanceof BukkitChunkGeneratorWrapper wrapper)) return false;
-            String fullId = wrapper.getPack().getRegistryKey().toString();
-            return fullId.toLowerCase().contains("chimera");
+            org.bukkit.generator.ChunkGenerator gen = world.getGenerator();
+            if (gen == null) return false;
+            try {
+                Object pack = gen.getClass().getMethod("getPack").invoke(gen);
+                if (pack == null) return false;
+                Object key = pack.getClass().getMethod("getRegistryKey").invoke(pack);
+                return key != null && key.toString().toLowerCase().contains("chimera");
+            } catch (Exception e) {
+                return false;
+            }
         });
     }
 

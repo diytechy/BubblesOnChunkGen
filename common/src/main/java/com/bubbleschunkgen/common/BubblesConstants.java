@@ -21,6 +21,28 @@ public final class BubblesConstants {
     public static final int BLOCK_CHEST = 6;
     public static final int BLOCK_OTHER = 99;
 
+    // -------------------------------------------------------------------------
+    // Compile-time feature flags
+    // -------------------------------------------------------------------------
+
+    /**
+     * When true, existing (previously generated) chunks are scanned on load to
+     * re-register flow-blocking surfaces and restore griefed soul sand.
+     * Requires PLACE_BEDROCK_SIGNATURE to be useful — disable both together
+     * to eliminate all overhead on existing chunk loads.
+     */
+    public static final boolean PROCESS_EXISTING_CHUNKS = false;
+
+    /**
+     * When true, a bedrock block is placed one below each converted soul sand
+     * column as a persistent signature used by existing-chunk processing.
+     * Disable to avoid leaving bedrock artifacts in the world.
+     * If false, PROCESS_EXISTING_CHUNKS will find nothing and is a no-op.
+     */
+    public static final boolean PLACE_BEDROCK_SIGNATURE = false;
+
+    // -------------------------------------------------------------------------
+
     // System properties for conflict detection
     public static final String PROP_TERRA_ADDON = "bubbleschunkgen.terra-addon";
     public static final String PROP_PLUGIN_BUKKIT = "bubbleschunkgen.plugin.bukkit";
