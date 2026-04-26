@@ -17,3 +17,10 @@ In all cases there should be clear errors / warnings for dependencies or issues 
 ###############################
 
 Can we actually make a compile time option to switch between 1.21.11 and 26.1?  This option 
+
+
+########################
+
+
+
+Additionally, I would like to ensure this addon mechanism (freezing chunks and soulsand) only occurs for specifically the CHIMERA world generator.  Is that as simple as changing the generator check text to "chimera" instead of the generic "terra" that is currently implemented?
