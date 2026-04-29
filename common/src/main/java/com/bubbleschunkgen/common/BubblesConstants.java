@@ -4,10 +4,10 @@ public final class BubblesConstants {
 
     private BubblesConstants() {}
 
-    public static final int MIN_Y = 50;
+    public static final int MIN_Y = 45;
     public static final int MAX_Y = 165;
 
-    public static final int MAX_UPDATES_PER_CHUNK = 60;
+    public static final int MAX_UPDATES_PER_CHUNK = 100;
 
     public static final int[][] SIDE_OFFSETS = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
 
@@ -31,7 +31,7 @@ public final class BubblesConstants {
      * Requires PLACE_BEDROCK_SIGNATURE to be useful — disable both together
      * to eliminate all overhead on existing chunk loads.
      */
-    public static final boolean PROCESS_EXISTING_CHUNKS = false;
+    public static final boolean PROCESS_EXISTING_CHUNKS = true;
 
     /**
      * When true, a bedrock block is placed one below each converted soul sand
@@ -39,7 +39,7 @@ public final class BubblesConstants {
      * Disable to avoid leaving bedrock artifacts in the world.
      * If false, PROCESS_EXISTING_CHUNKS will find nothing and is a no-op.
      */
-    public static final boolean PLACE_BEDROCK_SIGNATURE = false;
+    public static final boolean PLACE_BEDROCK_SIGNATURE = true;
 
     // -------------------------------------------------------------------------
 
