@@ -52,7 +52,7 @@ publishing {
         mavenLocal()
         maven {
             name = "Repsy"
-            url = uri("https://repo.repsy.io/mvn/diytechy/bubbleschunkgen")
+            url = uri("https://repo.repsy.io/mvn/diytechy/bubblesonchunkgen")
             credentials {
                 username = project.findProperty("repsy.user") as String? ?: System.getenv("REPSY_USERNAME")
                 password = project.findProperty("repsy.key") as String? ?: System.getenv("REPSY_PASSWORD")
