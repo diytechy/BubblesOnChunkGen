@@ -3,6 +3,8 @@ name: Build & Publish Terra Addon to Repsy
 on:
   push:
     branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
 
 jobs:
   build-and-publish:
@@ -24,6 +26,7 @@ jobs:
         run: chmod +x ./gradlew && ./gradlew build
 
       - name: Publish Terra addon to Repsy
+        if: github.event_name == 'push'
         run: ./gradlew :terra-addon:publish
         env:
           REPSY_USERNAME: ${{ secrets.REPSY_USERNAME }}
