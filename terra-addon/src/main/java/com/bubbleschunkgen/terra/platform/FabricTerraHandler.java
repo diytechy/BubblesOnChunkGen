@@ -1,4 +1,4 @@
-package com.bubbleschunkgen.fabric;
+package com.bubbleschunkgen.terra.platform;
 
 import com.bubbleschunkgen.common.*;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
@@ -15,25 +15,29 @@ import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.ChunkGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import static com.bubbleschunkgen.common.BubblesConstants.*;
 
-public class FabricChunkHandler {
+public class FabricTerraHandler {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger("BubblesOnChunkGen");
+    private static final Logger LOGGER = LoggerFactory.getLogger("BubblesOnChunkGen-Terra");
     private final FlowBlocker flowBlocker = new FlowBlocker();
     private final BubblesLogic logic;
+    private final Map<String, Boolean> chimeraWorldCache = new HashMap<>();
     private boolean debug = false;
 
     private final Queue<DelayedTask> delayedTasks = new ConcurrentLinkedQueue<>();
 
-    public FabricChunkHandler() {
+    public FabricTerraHandler() {
         FlowBlocker.setGlobalInstance(flowBlocker);
 
         PlatformBridge bridge = new PlatformBridge() {
@@ -75,7 +79,7 @@ public class FabricChunkHandler {
 
     public void register() {
         ServerChunkEvents.CHUNK_LOAD.register((level, chunk, isNewChunk) -> {
-            // TODO: Add Terra world detection for Fabric
+            if (!isChimeraWorld(level)) return;
             FabricBlockAccess access = new FabricBlockAccess(chunk, level);
             if (isNewChunk) {
                 logic.onNewChunkLoad(access);
@@ -85,6 +89,7 @@ public class FabricChunkHandler {
         });
 
         ServerChunkEvents.CHUNK_UNLOAD.register((level, chunk) -> {
+            if (!isChimeraWorld(level)) return;
             logic.onChunkUnload(chunk.getPos().x(), chunk.getPos().z());
         });
 
@@ -96,6 +101,20 @@ public class FabricChunkHandler {
                 }
                 return false;
             });
+        });
+    }
+
+    private boolean isChimeraWorld(ServerLevel level) {
+        return chimeraWorldCache.computeIfAbsent(level.dimension().toString(), k -> {
+            try {
+                ChunkGenerator gen = level.getChunkSource().getGenerator();
+                Object pack = gen.getClass().getMethod("getPack").invoke(gen);
+                if (pack == null) return false;
+                Object key = pack.getClass().getMethod("getRegistryKey").invoke(pack);
+                return key != null && key.toString().toLowerCase().contains("chimera");
+            } catch (Exception e) {
+                return false;
+            }
         });
     }
 

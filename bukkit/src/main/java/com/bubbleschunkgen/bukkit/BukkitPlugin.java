@@ -11,7 +11,7 @@ public class BukkitPlugin extends JavaPlugin {
 
     @Override
     public void onEnable() {
-        // Conflict detection: if Terra addon is already active, disable this plugin
+        // Conflict detection: if the Terra addon is already active, bow out.
         if ("true".equals(System.getProperty(BubblesConstants.PROP_TERRA_ADDON))) {
             getLogger().warning("BubblesOnChunkGen Terra addon is active - disabling standalone plugin. "
                     + "Remove this plugin JAR if using Terra.");
@@ -19,15 +19,8 @@ public class BukkitPlugin extends JavaPlugin {
             return;
         }
 
-        System.setProperty(BubblesConstants.PROP_PLUGIN_BUKKIT, "true");
-
         getServer().getPluginManager().registerEvents(new BukkitChunkListener(this), this);
         getLogger().info("BubblesOnChunkGen (Bukkit) enabled - will trigger bubble columns on new chunks.");
-    }
-
-    @Override
-    public void onDisable() {
-        System.clearProperty(BubblesConstants.PROP_PLUGIN_BUKKIT);
     }
 
     @Override

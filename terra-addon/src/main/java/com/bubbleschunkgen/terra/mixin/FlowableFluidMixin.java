@@ -1,4 +1,4 @@
-package com.bubbleschunkgen.fabric.mixin;
+package com.bubbleschunkgen.terra.mixin;
 
 import com.bubbleschunkgen.common.FlowBlocker;
 import net.minecraft.core.BlockPos;
@@ -12,12 +12,17 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+/**
+ * Cancels water spread when FlowBlocker has flagged the source or target
+ * coordinate. Safe no-op when no FlowBlocker has been installed (e.g. running
+ * on a server without Terra, or before the Terra addon has initialised).
+ */
 @Mixin(FlowingFluid.class)
 public class FlowableFluidMixin {
 
     @Inject(method = "spreadTo", at = @At("HEAD"), cancellable = true)
     private void bubbles$onSpreadTo(LevelAccessor level, BlockPos pos, BlockState blockState,
-                                     Direction direction, FluidState fluidState, CallbackInfo ci) {
+                                    Direction direction, FluidState fluidState, CallbackInfo ci) {
         FlowBlocker blocker = FlowBlocker.getGlobalInstance();
         if (blocker == null) return;
 

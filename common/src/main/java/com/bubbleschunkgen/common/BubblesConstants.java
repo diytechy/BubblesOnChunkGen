@@ -43,11 +43,12 @@ public final class BubblesConstants {
 
     // -------------------------------------------------------------------------
 
-    // System properties for conflict detection
+    // Signal flag for cross-loader coordination on Bukkit. The Terra addon's
+    // BukkitTerraHandler sets this on registration so the standalone Bukkit
+    // plugin (if also installed) can bow out and avoid double-listening.
+    // Fabric/Forge no longer need a property: the Terra-addon JAR is the only
+    // bubble-column code on those platforms.
     public static final String PROP_TERRA_ADDON = "bubbleschunkgen.terra-addon";
-    public static final String PROP_PLUGIN_BUKKIT = "bubbleschunkgen.plugin.bukkit";
-    public static final String PROP_PLUGIN_FORGE = "bubbleschunkgen.plugin.forge";
-    public static final String PROP_PLUGIN_FABRIC = "bubbleschunkgen.plugin.fabric";
 
     /** Pack world x/y/z into a single long for fast set lookups. */
     public static long coordKey(int x, int y, int z) {

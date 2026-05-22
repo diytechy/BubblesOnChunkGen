@@ -6,7 +6,10 @@ license = "MIT"
 modId = "bubbleschunkgen"
 version = "${version}"
 displayName = "BubblesOnChunkGen"
-description = "Triggers block updates on soul_sand under water after chunk generation to create bubble columns."
+description = "Terra addon that activates bubble columns in CHIMERA-generated rivers. Also loads as a NeoForge mod to register the water-flow mixin."
+
+[[mixins]]
+config = "bubbleschunkgen.mixins.json"
 
 [[dependencies.bubbleschunkgen]]
 modId = "neoforge"

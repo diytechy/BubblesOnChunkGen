@@ -1,6 +1,5 @@
 package com.bubbleschunkgen.terra;
 
-import com.bubbleschunkgen.common.BubblesConstants;
 import com.bubbleschunkgen.terra.platform.PlatformDetector;
 import com.dfsek.terra.addons.manifest.api.AddonInitializer;
 import com.dfsek.terra.api.Platform;
@@ -11,8 +10,12 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Terra addon entry point for BubblesOnChunkGen.
- * Detects the underlying server platform and registers appropriate
- * chunk load/unload and water flow blocking listeners.
+ * Detects the underlying server platform and registers the matching handler.
+ *
+ * On Fabric and NeoForge this JAR is also loaded as a mod (see fabric.mod.json
+ * and META-INF/neoforge.mods.toml) so that {@link com.bubbleschunkgen.terra.mixin.FlowableFluidMixin}
+ * is registered before Terra calls into us. That entry-point side does nothing
+ * else; CHIMERA detection and chunk handling are wired up here, from Terra.
  */
 public class BubblesTerraAddon implements AddonInitializer {
 
@@ -28,48 +31,36 @@ public class BubblesTerraAddon implements AddonInitializer {
     public void initialize() {
         LOGGER.info("Initializing BubblesOnChunkGen Terra addon...");
 
-        // Set system property so standalone platform plugins can detect us
-        System.setProperty(BubblesConstants.PROP_TERRA_ADDON, "true");
-
-        // Warn if a standalone plugin was loaded before us
-        if ("true".equals(System.getProperty(BubblesConstants.PROP_PLUGIN_BUKKIT))) {
-            LOGGER.warn("Standalone Bukkit plugin detected. "
-                    + "The Terra addon handles bubble columns - please remove the standalone plugin.");
-        }
-        if ("true".equals(System.getProperty(BubblesConstants.PROP_PLUGIN_FORGE))) {
-            LOGGER.warn("Standalone Forge mod detected. "
-                    + "The Terra addon handles bubble columns - please remove the standalone mod.");
-        }
-        if ("true".equals(System.getProperty(BubblesConstants.PROP_PLUGIN_FABRIC))) {
-            LOGGER.warn("Standalone Fabric mod detected. "
-                    + "The Terra addon handles bubble columns - please remove the standalone mod.");
-        }
-
-        // Detect platform and register listeners
         PlatformDetector.ServerPlatform detectedPlatform = PlatformDetector.detect();
         LOGGER.info("Detected server platform: {}", detectedPlatform);
 
-        switch (detectedPlatform) {
-            case BUKKIT -> {
-                try {
+        try {
+            switch (detectedPlatform) {
+                case BUKKIT -> {
                     new com.bubbleschunkgen.terra.platform.BukkitTerraHandler().register();
                     LOGGER.info("Registered Bukkit chunk listeners for bubble column generation.");
-                } catch (Exception e) {
-                    LOGGER.error("Failed to register Bukkit listeners", e);
                 }
+                case FABRIC -> {
+                    new com.bubbleschunkgen.terra.platform.FabricTerraHandler().register();
+                    LOGGER.info("Registered Fabric chunk listeners for bubble column generation.");
+                }
+                case FORGE -> {
+                    new com.bubbleschunkgen.terra.platform.ForgeTerraHandler().register();
+                    LOGGER.info("Registered NeoForge chunk listeners for bubble column generation.");
+                }
+                case MINESTOM -> {
+                    new com.bubbleschunkgen.terra.platform.MinestomTerraHandler().register();
+                    LOGGER.info("Registered Minestom chunk listeners for bubble column generation.");
+                }
+                case ALLAY -> {
+                    new com.bubbleschunkgen.terra.platform.AllayTerraHandler().register();
+                    LOGGER.info("Registered Allay chunk listeners for bubble column generation.");
+                }
+                case UNKNOWN -> LOGGER.error("Could not detect server platform! "
+                        + "BubblesOnChunkGen Terra addon requires Bukkit/Paper, Fabric, NeoForge, Minestom, or Allay.");
             }
-            case FORGE -> {
-                LOGGER.warn("Forge platform detected but Terra addon Forge listeners are not yet implemented. "
-                        + "Use the standalone Forge mod instead.");
-            }
-            case FABRIC -> {
-                LOGGER.warn("Fabric platform detected but Terra addon Fabric listeners are not yet implemented. "
-                        + "Use the standalone Fabric mod instead.");
-            }
-            case UNKNOWN -> {
-                LOGGER.error("Could not detect server platform! "
-                        + "BubblesOnChunkGen requires Bukkit/Paper, Forge, or Fabric.");
-            }
+        } catch (Throwable t) {
+            LOGGER.error("Failed to register {} listeners", detectedPlatform, t);
         }
 
         LOGGER.info("BubblesOnChunkGen Terra addon initialized.");

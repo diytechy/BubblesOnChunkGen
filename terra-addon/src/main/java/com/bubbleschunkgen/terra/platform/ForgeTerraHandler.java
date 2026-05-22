@@ -1,4 +1,4 @@
-package com.bubbleschunkgen.forge;
+package com.bubbleschunkgen.terra.platform;
 
 import com.bubbleschunkgen.common.*;
 import net.minecraft.core.BlockPos;
@@ -12,6 +12,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
+import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.level.ChunkEvent;
@@ -19,23 +20,31 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import static com.bubbleschunkgen.common.BubblesConstants.*;
 
-public class ForgeChunkHandler {
+public class ForgeTerraHandler {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger("BubblesOnChunkGen");
+    private static final Logger LOGGER = LoggerFactory.getLogger("BubblesOnChunkGen-Terra");
     private final FlowBlocker flowBlocker = new FlowBlocker();
     private final BubblesLogic logic;
+    private final Map<String, Boolean> chimeraWorldCache = new HashMap<>();
+    // Tracks chunks seen at least once this session per dimension - used to
+    // distinguish new vs existing loads (NeoForge doesn't expose isNewChunk).
+    private final Map<String, Set<Long>> seenChunks = new ConcurrentHashMap<>();
     private boolean debug = false;
 
-    // Delayed task queue - processed each server tick
     private final Queue<DelayedTask> delayedTasks = new ConcurrentLinkedQueue<>();
 
-    public ForgeChunkHandler() {
+    public ForgeTerraHandler() {
         FlowBlocker.setGlobalInstance(flowBlocker);
 
         PlatformBridge bridge = new PlatformBridge() {
@@ -51,7 +60,6 @@ public class ForgeChunkHandler {
 
             @Override
             public void fillDedicationChest(BlockAccess chunk, int localX, int y, int localZ) {
-                // Forge chest filling handled via block entity
                 if (chunk instanceof ForgeBlockAccess fba) {
                     BlockPos pos = new BlockPos(
                             fba.getChunkX() * 16 + localX, y, fba.getChunkZ() * 16 + localZ);
@@ -85,14 +93,23 @@ public class ForgeChunkHandler {
     private void onChunkLoad(ChunkEvent.Load event) {
         if (!(event.getLevel() instanceof ServerLevel serverLevel)) return;
         if (!(event.getChunk() instanceof LevelChunk levelChunk)) return;
+        if (!isChimeraWorld(serverLevel)) return;
 
-        // TODO: Add Terra world detection for Forge
+        String dim = serverLevel.dimension().toString();
+        long ck = chunkKey(levelChunk.getPos().x(), levelChunk.getPos().z());
+        boolean firstSeenThisSession = seenChunks
+                .computeIfAbsent(dim, d -> ConcurrentHashMap.newKeySet())
+                .add(ck);
+
         ForgeBlockAccess access = new ForgeBlockAccess(levelChunk, serverLevel);
 
-        // NeoForge doesn't distinguish new vs existing chunks in the event.
-        // We detect new chunks by checking if soul sand markers or bedrock signatures exist.
-        // For now, treat all chunks as existing (scan for signatures).
-        logic.onExistingChunkLoad(access);
+        // First-time-seen + blue_concrete present -> treat as a freshly generated chunk.
+        // Otherwise treat as existing (bedrock signature scan).
+        if (firstSeenThisSession && hasBlueConcrete(access)) {
+            logic.onNewChunkLoad(access);
+        } else {
+            logic.onExistingChunkLoad(access);
+        }
     }
 
     private void onChunkUnload(ChunkEvent.Unload event) {
@@ -108,6 +125,31 @@ public class ForgeChunkHandler {
             }
             return false;
         });
+    }
+
+    private boolean isChimeraWorld(ServerLevel level) {
+        return chimeraWorldCache.computeIfAbsent(level.dimension().toString(), k -> {
+            try {
+                ChunkGenerator gen = level.getChunkSource().getGenerator();
+                Object pack = gen.getClass().getMethod("getPack").invoke(gen);
+                if (pack == null) return false;
+                Object key = pack.getClass().getMethod("getRegistryKey").invoke(pack);
+                return key != null && key.toString().toLowerCase().contains("chimera");
+            } catch (Exception e) {
+                return false;
+            }
+        });
+    }
+
+    private static boolean hasBlueConcrete(BlockAccess chunk) {
+        for (int y = MIN_Y; y <= MAX_Y; y++) {
+            for (int x = 0; x < 16; x++) {
+                for (int z = 0; z < 16; z++) {
+                    if (chunk.getBlockType(x, y, z) == BLOCK_BLUE_CONCRETE) return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static class DelayedTask {
@@ -146,7 +188,7 @@ public class ForgeChunkHandler {
         public void setBlockType(int localX, int y, int localZ, int type, boolean physics) {
             BlockPos pos = localToWorld(localX, y, localZ);
             BlockState state = typeToBlockState(type);
-            int flags = physics ? 3 : 2; // 3 = notify + update, 2 = notify only
+            int flags = physics ? 3 : 2;
             level.setBlock(pos, state, flags);
         }
 
@@ -158,9 +200,9 @@ public class ForgeChunkHandler {
         }
 
         @Override
-        public void setWaterLevel(int localX, int y, int localZ, int level, boolean physics) {
+        public void setWaterLevel(int localX, int y, int localZ, int waterLevel, boolean physics) {
             BlockPos pos = localToWorld(localX, y, localZ);
-            BlockState state = Blocks.WATER.defaultBlockState().setValue(LiquidBlock.LEVEL, level);
+            BlockState state = Blocks.WATER.defaultBlockState().setValue(LiquidBlock.LEVEL, waterLevel);
             int flags = physics ? 3 : 2;
             this.level.setBlock(pos, state, flags);
         }
