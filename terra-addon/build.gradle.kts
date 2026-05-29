@@ -51,7 +51,7 @@ configurations.all {
 // No dev runs are configured here - the JAR is meant to be dropped into Terra,
 // not launched standalone.
 neoForge {
-    version = "26.1.1.0-beta"
+    version = "26.1.2.59-beta"
 }
 
 dependencies {
@@ -61,11 +61,11 @@ dependencies {
     compileOnly("org.slf4j:slf4j-api:2.0.9")
 
     // Paper (Bukkit handler)
-    compileOnly("io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT")
+    compileOnly("io.papermc.paper:paper-api:26.1.1.build.+")
 
     // Fabric (handler + entry-point shim)
-    compileOnly("net.fabricmc:fabric-loader:0.18.4")
-    compileOnly("net.fabricmc.fabric-api:fabric-api:0.145.0+26.1")
+    compileOnly("net.fabricmc:fabric-loader:0.19.2")
+    compileOnly("net.fabricmc.fabric-api:fabric-api:0.149.1+26.1.2")
 
     // Mixin runtime (used by FlowableFluidMixin)
     compileOnly("org.spongepowered:mixin:0.8.7")
