@@ -3,12 +3,12 @@
   "id": "bubbleschunkgen",
   "version": "${version}",
   "name": "BubblesOnChunkGen",
-  "description": "Triggers block updates on soul_sand under water after chunk generation to create bubble columns.",
+  "description": "Terra addon that activates bubble columns in CHIMERA-generated rivers. Also loads as a Fabric mod to register the water-flow mixin.",
   "license": "MIT",
   "environment": "server",
   "entrypoints": {
     "server": [
-      "com.bubbleschunkgen.fabric.FabricMod"
+      "com.bubbleschunkgen.terra.platform.FabricEntry"
     ]
   },
   "mixins": [
@@ -16,7 +16,6 @@
   ],
   "depends": {
     "fabricloader": ">=0.18.0",
-    "fabric-api": "*",
     "minecraft": ">=26.1"
   }
 }

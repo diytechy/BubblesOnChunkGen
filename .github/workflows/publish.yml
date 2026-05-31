@@ -38,6 +38,4 @@ jobs:
           name: BubblesOnChunkGen-Jars
           path: |
             bukkit/build/libs/BubblesOnChunkGen-Bukkit-*.jar
-            forge/build/libs/BubblesOnChunkGen-Forge-*.jar
-            fabric/build/libs/BubblesOnChunkGen-Fabric-*.jar
             terra-addon/build/libs/BubblesOnChunkGen-TerraAddon-*.jar

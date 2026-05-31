@@ -57,5 +57,19 @@ There is a 1-in-1000 chance per bubble column that a dedication chest is placed 
 
 ## Requirements
 
-- Paper 1.21+
+Two distribution paths:
+
+**As a Terra addon** (recommended — works on every platform Terra supports)
 - Terra (with a configuration that places blue concrete markers for bubble columns)
+- One of:
+  - Paper 1.21+
+  - Fabric (MC 26.1+) — the addon JAR is also a Fabric mod so its water-flow mixin is registered
+  - NeoForge (MC 26.1+) — same, also a NeoForge mod
+  - Minestom (2026.05+) — fluid physics not run by default, so flow blocking is informational
+  - Allay (Bedrock) — *experimental*; bubble column physics and `liquid_depth` semantics differ from Java
+
+The Terra-addon JAR is a single artifact, safe to install on Fabric/NeoForge servers without Terra (the mixin no-ops when no FlowBlocker is registered).
+
+**As a standalone Bukkit plugin** (no Terra)
+- Paper 1.21+
+- Some other source of blue concrete markers under water

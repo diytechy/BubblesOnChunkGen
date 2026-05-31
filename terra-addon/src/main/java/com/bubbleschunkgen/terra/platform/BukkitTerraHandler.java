@@ -45,6 +45,11 @@ public class BukkitTerraHandler implements Listener {
     public void register() {
         FlowBlocker.setGlobalInstance(flowBlocker);
 
+        // Signal to a potential standalone Bukkit plugin that the Terra addon owns
+        // chunk handling on this server; the standalone plugin's onEnable bows out
+        // when it sees this set.
+        System.setProperty(PROP_TERRA_ADDON, "true");
+
         // Find the Terra plugin to register events with
         hostPlugin = Bukkit.getPluginManager().getPlugin("Terra");
         if (hostPlugin == null) {

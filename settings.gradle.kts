@@ -16,6 +16,4 @@ plugins {
 
 include("common")
 include("bukkit")
-include("forge")
-include("fabric")
 include("terra-addon")
