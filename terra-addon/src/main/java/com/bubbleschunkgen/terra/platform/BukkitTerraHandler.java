@@ -101,7 +101,7 @@ public class BukkitTerraHandler implements Listener {
                 BookMeta meta = (BookMeta) book.getItemMeta();
                 meta.setTitle("CHIMERA");
                 meta.setAuthor("CHIMERA");
-                meta.addPage("CHIMERA\n\nDedicated to Finnian and Armin");
+                meta.addPages(net.kyori.adventure.text.Component.text("CHIMERA\n\nDedicated to Finnian and Armin"));
                 book.setItemMeta(meta);
 
                 inv.setItem(0, book);
