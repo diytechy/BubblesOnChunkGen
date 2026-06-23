@@ -164,6 +164,23 @@ public class ForgeTerraHandler {
 
     /** NeoForge implementation of BlockAccess wrapping a LevelChunk. */
     static class ForgeBlockAccess implements BlockAccess {
+        // 26.2 removed the individual Blocks.BLUE_CONCRETE static field (colored blocks are
+        // now registered programmatically) and renamed ResourceLocation -> Identifier. Look the
+        // block up by registry path instead; using var to read the id avoids naming the renamed
+        // class, so this compiles against both 26.1 and 26.2.
+        private static final net.minecraft.world.level.block.Block BLUE_CONCRETE = resolveBlock("blue_concrete");
+
+        private static net.minecraft.world.level.block.Block resolveBlock(String path) {
+            var registry = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
+            for (var block : registry) {
+                var id = registry.getKey(block);
+                if (id != null && id.getNamespace().equals("minecraft") && id.getPath().equals(path)) {
+                    return block;
+                }
+            }
+            return Blocks.AIR;
+        }
+
         private final LevelChunk chunk;
         private final ServerLevel level;
 
@@ -228,7 +245,7 @@ public class ForgeTerraHandler {
         private static int blockStateToType(BlockState state) {
             if (state.is(Blocks.WATER)) return BLOCK_WATER;
             if (state.is(Blocks.BUBBLE_COLUMN)) return BLOCK_BUBBLE_COLUMN;
-            if (state.is(Blocks.BLUE_CONCRETE)) return BLOCK_BLUE_CONCRETE;
+            if (state.is(BLUE_CONCRETE)) return BLOCK_BLUE_CONCRETE;
             if (state.is(Blocks.SOUL_SAND)) return BLOCK_SOUL_SAND;
             if (state.is(Blocks.BEDROCK)) return BLOCK_BEDROCK;
             if (state.is(Blocks.CHEST)) return BLOCK_CHEST;
@@ -240,7 +257,7 @@ public class ForgeTerraHandler {
             return switch (type) {
                 case BLOCK_WATER -> Blocks.WATER.defaultBlockState();
                 case BLOCK_BUBBLE_COLUMN -> Blocks.BUBBLE_COLUMN.defaultBlockState();
-                case BLOCK_BLUE_CONCRETE -> Blocks.BLUE_CONCRETE.defaultBlockState();
+                case BLOCK_BLUE_CONCRETE -> BLUE_CONCRETE.defaultBlockState();
                 case BLOCK_SOUL_SAND -> Blocks.SOUL_SAND.defaultBlockState();
                 case BLOCK_BEDROCK -> Blocks.BEDROCK.defaultBlockState();
                 case BLOCK_CHEST -> Blocks.CHEST.defaultBlockState();
