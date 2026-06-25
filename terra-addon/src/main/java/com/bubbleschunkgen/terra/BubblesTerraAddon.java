@@ -1,10 +1,14 @@
 package com.bubbleschunkgen.terra;
 
+import com.bubbleschunkgen.terra.platform.DedicationLootTable;
 import com.bubbleschunkgen.terra.platform.PlatformDetector;
 import com.dfsek.terra.addons.manifest.api.AddonInitializer;
 import com.dfsek.terra.api.Platform;
 import com.dfsek.terra.api.addon.BaseAddon;
+import com.dfsek.terra.api.event.events.config.pack.ConfigPackPreLoadEvent;
+import com.dfsek.terra.api.event.functional.FunctionalEventHandler;
 import com.dfsek.terra.api.inject.annotations.Inject;
+import com.dfsek.terra.api.structure.LootTable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,6 +34,8 @@ public class BubblesTerraAddon implements AddonInitializer {
     @Override
     public void initialize() {
         LOGGER.info("Initializing BubblesOnChunkGen Terra addon...");
+
+        registerDedicationLootTable();
 
         PlatformDetector.ServerPlatform detectedPlatform = PlatformDetector.detect();
         LOGGER.info("Detected server platform: {}", detectedPlatform);
@@ -70,5 +76,28 @@ public class BubblesTerraAddon implements AddonInitializer {
         }
 
         LOGGER.info("BubblesOnChunkGen Terra addon initialized.");
+    }
+
+    /**
+     * Terra's loot-table registry is created but never populated by the core
+     * addons, so {@code loot(...)} calls would otherwise find nothing. Register
+     * the dedication chest's loot table (emeralds + diamonds) under
+     * {@code bubbles-chunk-gen:dedication} into every pack as it loads; a
+     * {@code .tesf} structure invokes it by that key. The dedication written
+     * book is added on top by the per-platform {@code DedicationChestListener}.
+     */
+    private void registerDedicationLootTable() {
+        platform.getEventManager()
+                .getHandler(FunctionalEventHandler.class)
+                .register(addon, ConfigPackPreLoadEvent.class)
+                .then(event -> {
+                    try {
+                        event.getPack().getOrCreateRegistry(LootTable.class)
+                                .register(addon.key("dedication"), new DedicationLootTable(platform));
+                    } catch (Exception e) {
+                        // Already registered for this pack, or registry unavailable - ignore.
+                    }
+                })
+                .failThrough();
     }
 }

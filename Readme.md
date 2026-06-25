@@ -36,8 +36,9 @@ Bedrock naturally occurs only far below the river-Y scan range (`MIN_Y`–`MAX_Y
 
 The dedication chest is an easter egg placed by **world generation**, not by this plugin:
 
-- A low-probability `.tesf` structure places a `minecraft:chest` beside a column and fills it from a Terra **loot table** (emeralds + diamonds).
-- Terra loot tables cannot encode a written book's title/author/pages, so the addon listens for Terra's `LootPopulateEvent` and injects the "CHIMERA — Dedicated to Finnian and Armin" written book into any chest whose loot structure id contains `dedication`. This works on **Bukkit/Paper, Fabric, and NeoForge** (the platforms where Terra populates container loot). On Minestom/Allay the chest and its loot-table items still appear; the custom book does not.
+- A low-probability `.tesf` structure (with `dedication` in its id) places a `minecraft:chest` beside a column and calls `loot(x, y, z, "bubbles-chunk-gen:dedication")`.
+- Terra creates a loot-table registry but its core addons never populate it, so the Terra addon registers the `bubbles-chunk-gen:dedication` table (emeralds + diamonds) into every pack as it loads. Those items are placed through Terra's cross-platform item handle, so they appear on **all** platforms.
+- Terra loot tables cannot encode a written book's title/author/pages, so the addon also listens for Terra's `LootPopulateEvent` (fired by that `loot(...)` call) and injects the "CHIMERA — Dedicated to Finnian and Armin" written book. The book works on **Bukkit/Paper, Fabric, and NeoForge**; on Minestom/Allay the chest and its loot items still appear, but not the book.
 
 This keeps all chest placement in worldgen and removes the per-platform chest code the plugin used to carry.
 
