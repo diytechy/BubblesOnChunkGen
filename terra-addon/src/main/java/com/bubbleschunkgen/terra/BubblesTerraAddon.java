@@ -46,10 +46,12 @@ public class BubblesTerraAddon implements AddonInitializer {
                 }
                 case FABRIC -> {
                     new com.bubbleschunkgen.terra.platform.FabricTerraHandler().register();
+                    new com.bubbleschunkgen.terra.platform.ModDedicationChestListener(platform, addon, "Fabric").register();
                     LOGGER.info("Registered Fabric chunk listeners for bubble column generation.");
                 }
                 case FORGE -> {
                     new com.bubbleschunkgen.terra.platform.ForgeTerraHandler().register();
+                    new com.bubbleschunkgen.terra.platform.ModDedicationChestListener(platform, addon, "NeoForge").register();
                     LOGGER.info("Registered NeoForge chunk listeners for bubble column generation.");
                 }
                 case MINESTOM -> {
