@@ -24,3 +24,35 @@ Can we actually make a compile time option to switch between 1.21.11 and 26.1?  
 
 
 Additionally, I would like to ensure this addon mechanism (freezing chunks and soulsand) only occurs for specifically the CHIMERA world generator.  Is that as simple as changing the generator check text to "chimera" instead of the generic "terra" that is currently implemented?
+
+############################
+Design shift:
+ALT 1: Set L1 water using plugin directly, requires tick during chunk load intercept.  Guarantees no flow.
+ALT 2: Set L1 water using Terra, plugin needs to prevent flow (or drying up of L1 water) before chunk ticks.  May not be possible.
+ALT 3: Don't set any L1 water at all.  Instead, for all soulsand, when air is reached, just block that air block from becoming a source water block.  Water is still permitted to spread out
+
+
+Wait, let's change this a little bit then.
+
+The full flow becomes:
+
+Scan the chunk within the defined y-range (Now from 45 to 245) from bottom to top
+At each y level, scan through the chunk (x,z):
+
+1. If bedrock is found with no bedrock above or below it, restore soulsand above assuming it was the location of a bubble column that had been grieffed.
+2. If soul sand is found (might have been placed from previous y-level), set all adjacent columns as potential flow freezing columns.
+3. 
+
+CHIMERA CHANGE: 
+Add a structure feature to base and hydraxia_base that places black state 1 water blocks (lowest water level) whenever the river distance to uplift is less than the soulsand place distance (distributor), located when air is above a source block.
+
+Bubbles on chunk gen change:
+
+Instead of placing any blocks in this plugin, all it will do is provide a fill definition for the dedication chest (already done) and then prevent destruction of 
+
+In bubbles in chunk gen, we only 
+
+block(0, 0, 0, "minecraft:water[level=7]", true);
+
+
+Direction 1:
