@@ -112,21 +112,29 @@ public class BubblesLogic {
                 continue;
             }
 
-            // First non-column block above the soul sand is the surface. Cap an
-            // air / flowing-water surface with a thin frozen water step.
+            // First non-column block above the soul sand is the surface. Only cap
+            // it with a thin step when a higher water body sits nearby for the step
+            // to rise toward; otherwise a lone step block just looks like a bump.
             if (type == BLOCK_AIR || type == BLOCK_WATER) {
-                boolean alreadyCapped = type == BLOCK_WATER
+                boolean isOurStep = type == BLOCK_WATER
                         && chunk.getWaterLevel(x, y, z) == SURFACE_WATER_LEVEL;
-                if (!alreadyCapped) {
-                    chunk.setBlockType(x, y, z, BLOCK_WATER, false);
-                    chunk.setWaterLevel(x, y, z, SURFACE_WATER_LEVEL, false);
-                }
-                flowBlocker.addBlockedSurface(ck, worldX, y, worldZ);
-                count++;
 
-                if (bridge.isDebug()) {
-                    bridge.log("  Surface step at [" + worldX + ", " + y + ", " + worldZ
-                            + "] (level-" + SURFACE_WATER_LEVEL + " water, flow frozen)");
+                if (hasHigherWaterStep(chunk, x, y, z)) {
+                    if (!isOurStep) {
+                        chunk.setBlockType(x, y, z, BLOCK_WATER, false);
+                        chunk.setWaterLevel(x, y, z, SURFACE_WATER_LEVEL, false);
+                    }
+                    flowBlocker.addBlockedSurface(ck, worldX, y, worldZ);
+                    count++;
+
+                    if (bridge.isDebug()) {
+                        bridge.log("  Surface step at [" + worldX + ", " + y + ", " + worldZ
+                                + "] (level-" + SURFACE_WATER_LEVEL + " water, flow frozen)");
+                    }
+                } else if (isOurStep) {
+                    // A step placed on a previous pass that no longer has a higher
+                    // water body to rise toward - remove it.
+                    chunk.setBlockType(x, y, z, BLOCK_AIR, false);
                 }
             }
             break;
@@ -152,5 +160,34 @@ public class BubblesLogic {
             if (type == BLOCK_AIR) return true;
         }
         return false;
+    }
+
+    /**
+     * Returns true if a water source sits {@code STEP_CHECK_DISTANCE} blocks away
+     * horizontally at the step's own height. Such a source belongs to a water body
+     * whose surface is higher than this column's, so the thin step should rise
+     * toward it. A flat, uniform-height river has only air at this height, so no
+     * step is placed.
+     */
+    private boolean hasHigherWaterStep(BlockAccess chunk, int x, int stepY, int z) {
+        for (int[] offset : SIDE_OFFSETS) {
+            int nx = x + offset[0] * STEP_CHECK_DISTANCE;
+            int nz = z + offset[1] * STEP_CHECK_DISTANCE;
+            if (isWaterSource(chunk, nx, stepY, nz)) return true;
+        }
+        return false;
+    }
+
+    /** Water-source check that tolerates out-of-chunk local coordinates. */
+    private boolean isWaterSource(BlockAccess chunk, int localX, int y, int localZ) {
+        if (localX < 0 || localX > 15 || localZ < 0 || localZ > 15) {
+            int worldX = chunk.getChunkX() * 16 + localX;
+            int worldZ = chunk.getChunkZ() * 16 + localZ;
+            // Cross-chunk: only the block type is available (not its level), so
+            // treat any water there as a candidate higher body.
+            return chunk.getBlockTypeAtWorld(worldX, y, worldZ) == BLOCK_WATER;
+        }
+        return chunk.getBlockType(localX, y, localZ) == BLOCK_WATER
+                && chunk.getWaterLevel(localX, y, localZ) == 0;
     }
 }
