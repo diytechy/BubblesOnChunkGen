@@ -12,19 +12,7 @@ public final class BubblesConstants {
 
     public static final int[][] SIDE_OFFSETS = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
 
-    /**
-     * Block level applied to the thin water "step" placed at the top of each
-     * column. 7 is the lowest (thinnest) water level in Java.
-     */
-    public static final int SURFACE_WATER_LEVEL = 7;
 
-    /**
-     * Horizontal distance to look for a higher water source when deciding whether
-     * a surface step is warranted. The step is only placed when a water source
-     * sits this far away at the step's own height, so the thin block bridges up to
-     * a genuinely higher water body instead of appearing as a lone bump.
-     */
-    public static final int STEP_CHECK_DISTANCE = 2;
 
     // Block type constants used by BlockAccess
     public static final int BLOCK_AIR = 0;

@@ -5,20 +5,15 @@ import static com.bubbleschunkgen.common.BubblesConstants.*;
 /**
  * Platform-agnostic core logic for bubble column maintenance.
  *
- * <p>World generation (Terra/CHIMERA) now places the soul sand directly, with a
+ * <p>World generation (Terra/CHIMERA) places the soul sand directly, with a
  * bedrock block one below it as a persistent signature. This class no longer
- * places any of those blocks; on every chunk load it simply:
+ * places or restores any of those blocks on chunk load; instead it passively records
+ * their locations to:
  * <ol>
- *   <li>finds each bedrock signature and restores the soul sand above it if a
- *       player has removed it (anti-grief);</li>
- *   <li>freezes every water/bubble-column block above the soul sand that is
- *       adjacent to air, walking up until air above the column is reached, so
- *       the bubble column cannot spill sideways and grow the river; and</li>
- *   <li>caps the surface with a thin (level-7) water step.</li>
+ *   <li>prevent players from mining the soul sand (anti-griefing); and</li>
+ *   <li>prevent water columns from forming adjacent source blocks, so the
+ *       river naturally cascades but does not permanently widen.</li>
  * </ol>
- *
- * <p>Every step is idempotent, so the same path runs for freshly generated and
- * disk-loaded chunks alike — no new-vs-existing distinction is needed.
  */
 public class BubblesLogic {
 
@@ -35,33 +30,25 @@ public class BubblesLogic {
     }
 
     /**
-     * Called whenever a chunk is loaded (new or from disk). Blanket-freezes the
-     * chunk while it settles, then processes its columns after a short delay and
-     * lifts the blanket freeze.
+     * Called whenever a chunk is loaded (new or from disk). 
+     * Processes its columns after a short delay to allow worldgen to finish settling.
      */
     public void onChunkLoad(BlockAccess chunk) {
-        long ck = chunkKey(chunk.getChunkX(), chunk.getChunkZ());
-        flowBlocker.addPendingChunk(ck);
-
-        bridge.runDelayed(() -> {
-            processColumns(chunk);
-            flowBlocker.removePendingChunk(ck);
-        }, PROCESS_DELAY_TICKS);
+        bridge.runDelayed(() -> processColumns(chunk), PROCESS_DELAY_TICKS);
     }
 
-    /** Called when a chunk unloads. Cleans up flow-blocking data. */
+    /** Called when a chunk unloads. Cleans up tracking data. */
     public void onChunkUnload(int chunkX, int chunkZ) {
         flowBlocker.removeChunk(chunkKey(chunkX, chunkZ));
     }
 
     /**
-     * Scans the chunk for bedrock signatures, restores griefed soul sand, and
-     * freezes the water column above each.
+     * Scans the chunk for bedrock signatures and registers the soul sand
+     * and water columns for passive protection.
      */
     private void processColumns(BlockAccess chunk) {
         long ck = chunkKey(chunk.getChunkX(), chunk.getChunkZ());
-        int frozen = 0;
-        int restored = 0;
+        int protectedCols = 0;
 
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
@@ -69,35 +56,30 @@ public class BubblesLogic {
                     if (chunk.getBlockType(x, y, z) != BLOCK_BEDROCK) continue;
 
                     int soulSandY = y + 1;
-                    if (chunk.getBlockType(x, soulSandY, z) != BLOCK_SOUL_SAND) {
-                        // Soul sand removed (griefed) - restore it above the signature.
-                        chunk.setBlockType(x, soulSandY, z, BLOCK_SOUL_SAND, true);
-                        restored++;
-                    }
+                    int worldX = chunk.getChunkX() * 16 + x;
+                    int worldZ = chunk.getChunkZ() * 16 + z;
 
-                    frozen += freezeColumnAbove(chunk, ck, x, soulSandY, z);
+                    flowBlocker.addProtectedSoulSand(ck, worldX, soulSandY, worldZ);
+                    
+                    // Register the water column above it
+                    trackColumnAbove(chunk, ck, x, soulSandY, z, worldX, worldZ);
+                    protectedCols++;
                 }
             }
         }
 
-        if (bridge.isDebug() && (frozen > 0 || restored > 0)) {
+        if (bridge.isDebug() && protectedCols > 0) {
             bridge.log("Chunk [" + chunk.getChunkX() + ", " + chunk.getChunkZ()
-                    + "]: froze " + frozen + " water block(s), restored " + restored + " soul sand");
+                    + "]: protected " + protectedCols + " bubble column(s)");
         }
     }
 
     /**
-     * Walks up from the soul sand. Every full-source-water / bubble-column block
-     * that touches air horizontally is registered as a blocked surface, so it
-     * cannot spread. The walk stops at the first block above the column; if that
-     * block is air or flowing water it is capped with a thin (level-7) frozen
-     * water step. Returns the number of coordinates frozen.
+     * Walks up from the soul sand, registering every full-source-water or 
+     * bubble-column block as a protected water column, so they cannot form
+     * adjacent source blocks.
      */
-    private int freezeColumnAbove(BlockAccess chunk, long ck, int x, int soulSandY, int z) {
-        int worldX = chunk.getChunkX() * 16 + x;
-        int worldZ = chunk.getChunkZ() * 16 + z;
-        int count = 0;
-
+    private void trackColumnAbove(BlockAccess chunk, long ck, int x, int soulSandY, int z, int worldX, int worldZ) {
         for (int y = soulSandY + 1; y <= MAX_Y; y++) {
             int type = chunk.getBlockType(x, y, z);
 
@@ -105,89 +87,10 @@ public class BubblesLogic {
                     || (type == BLOCK_WATER && chunk.getWaterLevel(x, y, z) == 0);
 
             if (columnWater) {
-                if (hasAdjacentAir(chunk, x, y, z)) {
-                    flowBlocker.addBlockedSurface(ck, worldX, y, worldZ);
-                    count++;
-                }
-                continue;
-            }
-
-            // First non-column block above the soul sand is the surface. Only cap
-            // it with a thin step when a higher water body sits nearby for the step
-            // to rise toward; otherwise a lone step block just looks like a bump.
-            if (type == BLOCK_AIR || type == BLOCK_WATER) {
-                boolean isOurStep = type == BLOCK_WATER
-                        && chunk.getWaterLevel(x, y, z) == SURFACE_WATER_LEVEL;
-
-                if (hasHigherWaterStep(chunk, x, y, z)) {
-                    if (!isOurStep) {
-                        chunk.setBlockType(x, y, z, BLOCK_WATER, false);
-                        chunk.setWaterLevel(x, y, z, SURFACE_WATER_LEVEL, false);
-                    }
-                    flowBlocker.addBlockedSurface(ck, worldX, y, worldZ);
-                    count++;
-
-                    if (bridge.isDebug()) {
-                        bridge.log("  Surface step at [" + worldX + ", " + y + ", " + worldZ
-                                + "] (level-" + SURFACE_WATER_LEVEL + " water, flow frozen)");
-                    }
-                } else if (isOurStep) {
-                    // A step placed on a previous pass that no longer has a higher
-                    // water body to rise toward - remove it.
-                    chunk.setBlockType(x, y, z, BLOCK_AIR, false);
-                }
-            }
-            break;
-        }
-        return count;
-    }
-
-    /** Returns true if any of the 4 horizontal neighbors is air. */
-    private boolean hasAdjacentAir(BlockAccess chunk, int x, int y, int z) {
-        for (int[] offset : SIDE_OFFSETS) {
-            int nx = x + offset[0];
-            int nz = z + offset[1];
-
-            int type;
-            if (nx < 0 || nx > 15 || nz < 0 || nz > 15) {
-                int worldX = chunk.getChunkX() * 16 + nx;
-                int worldZ = chunk.getChunkZ() * 16 + nz;
-                type = chunk.getBlockTypeAtWorld(worldX, y, worldZ);
+                flowBlocker.addProtectedWaterColumn(ck, worldX, y, worldZ);
             } else {
-                type = chunk.getBlockType(nx, y, nz);
+                break;
             }
-
-            if (type == BLOCK_AIR) return true;
         }
-        return false;
-    }
-
-    /**
-     * Returns true if a water source sits {@code STEP_CHECK_DISTANCE} blocks away
-     * horizontally at the step's own height. Such a source belongs to a water body
-     * whose surface is higher than this column's, so the thin step should rise
-     * toward it. A flat, uniform-height river has only air at this height, so no
-     * step is placed.
-     */
-    private boolean hasHigherWaterStep(BlockAccess chunk, int x, int stepY, int z) {
-        for (int[] offset : SIDE_OFFSETS) {
-            int nx = x + offset[0] * STEP_CHECK_DISTANCE;
-            int nz = z + offset[1] * STEP_CHECK_DISTANCE;
-            if (isWaterSource(chunk, nx, stepY, nz)) return true;
-        }
-        return false;
-    }
-
-    /** Water-source check that tolerates out-of-chunk local coordinates. */
-    private boolean isWaterSource(BlockAccess chunk, int localX, int y, int localZ) {
-        if (localX < 0 || localX > 15 || localZ < 0 || localZ > 15) {
-            int worldX = chunk.getChunkX() * 16 + localX;
-            int worldZ = chunk.getChunkZ() * 16 + localZ;
-            // Cross-chunk: only the block type is available (not its level), so
-            // treat any water there as a candidate higher body.
-            return chunk.getBlockTypeAtWorld(worldX, y, worldZ) == BLOCK_WATER;
-        }
-        return chunk.getBlockType(localX, y, localZ) == BLOCK_WATER
-                && chunk.getWaterLevel(localX, y, localZ) == 0;
     }
 }

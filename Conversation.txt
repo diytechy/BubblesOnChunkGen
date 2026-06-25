@@ -28,7 +28,7 @@ Additionally, I would like to ensure this addon mechanism (freezing chunks and s
 ############################
 Design shift:
 
-Explore some alternatives which may simplify this plugin.  The core goal is to ensure water transitions correctly from a higher level to a lower level, and that bubble columns are available in such a way that boats can successfully traverse upwards to the next level (so that the higher level water does not sink the boat if it does not traverse from the top level)
+Explore some alternatives which may simplify the BubblesOnChunkGen plugin.  The core goal is to ensure water transitions correctly from a higher level to a lower level, and that bubble columns are available in such a way that boats can successfully traverse upwards to the next level (so that the higher level water does not sink the boat if it does not traverse from the top level)
 
 Alternatives for river water level transitions:
 
@@ -36,12 +36,12 @@ ALT 1: Set L1 water using plugin directly (as is done today), requires tick duri
 ALT 2: Set L1 water using Terra, plugin needs to prevent flow (or drying up of L1 water) before chunk ticks.  May not be possible.
 ALT 3: Don't set any L1 water at all.  Instead, for all soulsand, when air or non-source water is reached, just block that air block from becoming a source water block.  Water is still permitted to spread out, better creating a transition over the water elevation change, but perhaps to the detriment of slowing down boat travel at these points (since the water flow will push back against the boat's water traversal)
 
-Dealing with bedrock / soulsand:
+Alternatives for dealing with bedrock / soulsand:
 
 ALT 1: Don't perform any blocks on soulsand at all.  If bedrock is detected without soulsand above, forcibly set soulsand above.  (Current implementation)
 ALT 2: When soulsand is found, use a method to prevent its destruction (excluding OP?). This way there does not need to be any recovery method at all.  Bedrock could potentially be excluded, but the benefit of bedrock is that it still uniquely identifies river lift locations.  Blocking soul sand also prevents players from accessing a material they are not meant to get till they enter the nether.
 
-I believe the ideal case here is ALT 3 for river water transitions and ALT 2 for bedrock / soulsand.  But it requires a method to block water source block creation from neighboring source water blocks, and it requires a method to prevent non-op players from destroying / breaking specifics blocks.
+I believe the ideal case here is ALT 3 for river water transitions and ALT 2 for bedrock / soulsand.  But it requires a method to block water source block creation from neighboring source water blocks, and it requires a method to prevent non-op players from destroying / breaking specifics blocks.  Explore options for implementing that alternative combination and verify appropriate platform support, and suggest alternative design structures.
 
 
 Wait, let's change this a little bit then.

@@ -9,9 +9,11 @@ import org.bukkit.block.data.Levelled;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.block.BlockFromToEvent;
+import org.bukkit.event.block.BlockFormEvent;
+import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.event.world.ChunkUnloadEvent;
+import org.bukkit.entity.Player;
 import org.bukkit.generator.ChunkGenerator;
 
 import java.util.HashMap;
@@ -78,15 +80,32 @@ public class BukkitChunkListener implements Listener {
     }
 
     @EventHandler(ignoreCancelled = true)
-    public void onWaterFlow(BlockFromToEvent event) {
+    public void onBlockForm(BlockFormEvent event) {
         if (!isTerraWorld(event.getBlock().getWorld())) return;
-        Block from = event.getBlock();
-        Block to = event.getToBlock();
+        Block block = event.getBlock();
 
-        if (flowBlocker.shouldBlockFlow(
-                from.getX(), from.getY(), from.getZ(),
-                to.getX(), to.getY(), to.getZ())) {
-            event.setCancelled(true);
+        if (event.getNewState().getType() == Material.WATER) {
+            Levelled waterData = (Levelled) event.getNewState().getBlockData();
+            if (waterData.getLevel() == 0) { // level 0 is a source block
+                if (!flowBlocker.canFormSource(block.getX(), block.getY(), block.getZ())) {
+                    event.setCancelled(true);
+                }
+            }
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onBlockBreak(BlockBreakEvent event) {
+        if (!isTerraWorld(event.getBlock().getWorld())) return;
+        Block block = event.getBlock();
+
+        if (block.getType() == Material.SOUL_SAND) {
+            if (flowBlocker.isProtectedSoulSand(block.getX(), block.getY(), block.getZ())) {
+                Player player = event.getPlayer();
+                if (!player.isOp()) {
+                    event.setCancelled(true);
+                }
+            }
         }
     }
 

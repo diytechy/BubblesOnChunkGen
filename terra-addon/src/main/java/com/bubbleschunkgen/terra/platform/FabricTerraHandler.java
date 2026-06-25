@@ -70,6 +70,18 @@ public class FabricTerraHandler {
                 return false;
             });
         });
+
+        net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents.BEFORE.register((world, player, pos, state, entity) -> {
+            if (!(world instanceof ServerLevel) || !isChimeraWorld((ServerLevel) world)) return true;
+            if (state.is(Blocks.SOUL_SAND)) {
+                if (flowBlocker.isProtectedSoulSand(pos.getX(), pos.getY(), pos.getZ())) {
+                    if (!player.hasPermissions(2)) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        });
     }
 
     private boolean isChimeraWorld(ServerLevel level) {

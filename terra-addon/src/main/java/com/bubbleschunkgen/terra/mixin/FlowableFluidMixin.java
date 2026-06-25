@@ -13,9 +13,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Cancels water spread when FlowBlocker has flagged the source or target
- * coordinate. Safe no-op when no FlowBlocker has been installed (e.g. running
- * on a server without Terra, or before the Terra addon has initialised).
+ * Cancels water spread when the resulting block would become a source block
+ * in a protected column area. Safe no-op when no FlowBlocker has been installed.
  */
 @Mixin(FlowingFluid.class)
 public class FlowableFluidMixin {
@@ -26,10 +25,7 @@ public class FlowableFluidMixin {
         FlowBlocker blocker = FlowBlocker.getGlobalInstance();
         if (blocker == null) return;
 
-        BlockPos fromPos = pos.relative(direction.getOpposite());
-        if (blocker.shouldBlockFlow(
-                fromPos.getX(), fromPos.getY(), fromPos.getZ(),
-                pos.getX(), pos.getY(), pos.getZ())) {
+        if (fluidState.isSource() && !blocker.canFormSource(pos.getX(), pos.getY(), pos.getZ())) {
             ci.cancel();
         }
     }
