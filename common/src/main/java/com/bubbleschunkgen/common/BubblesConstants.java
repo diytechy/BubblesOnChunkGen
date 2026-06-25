@@ -7,41 +7,24 @@ public final class BubblesConstants {
     public static final int MIN_Y = 45;
     public static final int MAX_Y = 165;
 
-    public static final int MAX_UPDATES_PER_CHUNK = 100;
+    /** Tick delay between a chunk load and column processing (lets generation settle). */
+    public static final long PROCESS_DELAY_TICKS = 5L;
 
     public static final int[][] SIDE_OFFSETS = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+
+    /**
+     * Block level applied to the thin water "step" placed at the top of each
+     * column. 7 is the lowest (thinnest) water level in Java.
+     */
+    public static final int SURFACE_WATER_LEVEL = 7;
 
     // Block type constants used by BlockAccess
     public static final int BLOCK_AIR = 0;
     public static final int BLOCK_WATER = 1;
     public static final int BLOCK_BUBBLE_COLUMN = 2;
-    public static final int BLOCK_BLUE_CONCRETE = 3;
-    public static final int BLOCK_SOUL_SAND = 4;
-    public static final int BLOCK_BEDROCK = 5;
-    public static final int BLOCK_CHEST = 6;
+    public static final int BLOCK_SOUL_SAND = 3;
+    public static final int BLOCK_BEDROCK = 4;
     public static final int BLOCK_OTHER = 99;
-
-    // -------------------------------------------------------------------------
-    // Compile-time feature flags
-    // -------------------------------------------------------------------------
-
-    /**
-     * When true, existing (previously generated) chunks are scanned on load to
-     * re-register flow-blocking surfaces and restore griefed soul sand.
-     * Requires PLACE_BEDROCK_SIGNATURE to be useful — disable both together
-     * to eliminate all overhead on existing chunk loads.
-     */
-    public static final boolean PROCESS_EXISTING_CHUNKS = true;
-
-    /**
-     * When true, a bedrock block is placed one below each converted soul sand
-     * column as a persistent signature used by existing-chunk processing.
-     * Disable to avoid leaving bedrock artifacts in the world.
-     * If false, PROCESS_EXISTING_CHUNKS will find nothing and is a no-op.
-     */
-    public static final boolean PLACE_BEDROCK_SIGNATURE = true;
-
-    // -------------------------------------------------------------------------
 
     // Signal flag for cross-loader coordination on Bukkit. The Terra addon's
     // BukkitTerraHandler sets this on registration so the standalone Bukkit

@@ -38,6 +38,10 @@ public class BubblesTerraAddon implements AddonInitializer {
             switch (detectedPlatform) {
                 case BUKKIT -> {
                     new com.bubbleschunkgen.terra.platform.BukkitTerraHandler().register();
+                    // The dedication chest itself is placed + loot-filled by world
+                    // generation; this listener only injects the custom written book,
+                    // which Terra loot tables cannot express.
+                    new com.bubbleschunkgen.terra.platform.BukkitDedicationChestListener(platform, addon).register();
                     LOGGER.info("Registered Bukkit chunk listeners for bubble column generation.");
                 }
                 case FABRIC -> {

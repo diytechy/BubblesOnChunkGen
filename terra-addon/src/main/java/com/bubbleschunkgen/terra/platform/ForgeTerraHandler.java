@@ -3,15 +3,9 @@ package com.bubbleschunkgen.terra.platform;
 import com.bubbleschunkgen.common.*;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.network.chat.Component;
-import net.minecraft.server.network.Filterable;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.component.WrittenBookContent;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.LiquidBlock;
-import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.neoforged.neoforge.common.NeoForge;
@@ -21,12 +15,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Queue;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import static com.bubbleschunkgen.common.BubblesConstants.*;
@@ -37,9 +27,6 @@ public class ForgeTerraHandler {
     private final FlowBlocker flowBlocker = new FlowBlocker();
     private final BubblesLogic logic;
     private final Map<String, Boolean> chimeraWorldCache = new HashMap<>();
-    // Tracks chunks seen at least once this session per dimension - used to
-    // distinguish new vs existing loads (NeoForge doesn't expose isNewChunk).
-    private final Map<String, Set<Long>> seenChunks = new ConcurrentHashMap<>();
     private boolean debug = false;
 
     private final Queue<DelayedTask> delayedTasks = new ConcurrentLinkedQueue<>();
@@ -57,28 +44,6 @@ public class ForgeTerraHandler {
             public void runDelayed(Runnable task, long ticks) {
                 delayedTasks.add(new DelayedTask(task, ticks));
             }
-
-            @Override
-            public void fillDedicationChest(BlockAccess chunk, int localX, int y, int localZ) {
-                if (chunk instanceof ForgeBlockAccess fba) {
-                    BlockPos pos = new BlockPos(
-                            fba.getChunkX() * 16 + localX, y, fba.getChunkZ() * 16 + localZ);
-                    if (fba.getLevel().getBlockEntity(pos) instanceof ChestBlockEntity chest) {
-                        ItemStack book = new ItemStack(Items.WRITTEN_BOOK);
-                        book.set(net.minecraft.core.component.DataComponents.WRITTEN_BOOK_CONTENT,
-                                new WrittenBookContent(
-                                        Filterable.passThrough("CHIMERA"),
-                                        "CHIMERA",
-                                        0,
-                                        List.of(Filterable.passThrough(
-                                                Component.literal("CHIMERA\n\nDedicated to Finnian and Armin"))),
-                                        true));
-                        chest.setItem(0, book);
-                        chest.setItem(1, new ItemStack(Items.EMERALD, 6));
-                        chest.setItem(2, new ItemStack(Items.DIAMOND, 7));
-                    }
-                }
-            }
         };
 
         logic = new BubblesLogic(bridge, flowBlocker);
@@ -95,21 +60,7 @@ public class ForgeTerraHandler {
         if (!(event.getChunk() instanceof LevelChunk levelChunk)) return;
         if (!isChimeraWorld(serverLevel)) return;
 
-        String dim = serverLevel.dimension().toString();
-        long ck = chunkKey(levelChunk.getPos().x(), levelChunk.getPos().z());
-        boolean firstSeenThisSession = seenChunks
-                .computeIfAbsent(dim, d -> ConcurrentHashMap.newKeySet())
-                .add(ck);
-
-        ForgeBlockAccess access = new ForgeBlockAccess(levelChunk, serverLevel);
-
-        // First-time-seen + blue_concrete present -> treat as a freshly generated chunk.
-        // Otherwise treat as existing (bedrock signature scan).
-        if (firstSeenThisSession && hasBlueConcrete(access)) {
-            logic.onNewChunkLoad(access);
-        } else {
-            logic.onExistingChunkLoad(access);
-        }
+        logic.onChunkLoad(new ForgeBlockAccess(levelChunk, serverLevel));
     }
 
     private void onChunkUnload(ChunkEvent.Unload event) {
@@ -141,17 +92,6 @@ public class ForgeTerraHandler {
         });
     }
 
-    private static boolean hasBlueConcrete(BlockAccess chunk) {
-        for (int y = MIN_Y; y <= MAX_Y; y++) {
-            for (int x = 0; x < 16; x++) {
-                for (int z = 0; z < 16; z++) {
-                    if (chunk.getBlockType(x, y, z) == BLOCK_BLUE_CONCRETE) return true;
-                }
-            }
-        }
-        return false;
-    }
-
     private static class DelayedTask {
         final Runnable runnable;
         long ticksRemaining;
@@ -164,23 +104,6 @@ public class ForgeTerraHandler {
 
     /** NeoForge implementation of BlockAccess wrapping a LevelChunk. */
     static class ForgeBlockAccess implements BlockAccess {
-        // 26.2 removed the individual Blocks.BLUE_CONCRETE static field (colored blocks are
-        // now registered programmatically) and renamed ResourceLocation -> Identifier. Look the
-        // block up by registry path instead; using var to read the id avoids naming the renamed
-        // class, so this compiles against both 26.1 and 26.2.
-        private static final net.minecraft.world.level.block.Block BLUE_CONCRETE = resolveBlock("blue_concrete");
-
-        private static net.minecraft.world.level.block.Block resolveBlock(String path) {
-            var registry = net.minecraft.core.registries.BuiltInRegistries.BLOCK;
-            for (var block : registry) {
-                var id = registry.getKey(block);
-                if (id != null && id.getNamespace().equals("minecraft") && id.getPath().equals(path)) {
-                    return block;
-                }
-            }
-            return Blocks.AIR;
-        }
-
         private final LevelChunk chunk;
         private final ServerLevel level;
 
@@ -188,8 +111,6 @@ public class ForgeTerraHandler {
             this.chunk = chunk;
             this.level = level;
         }
-
-        ServerLevel getLevel() { return level; }
 
         private BlockPos localToWorld(int localX, int y, int localZ) {
             return new BlockPos(chunk.getPos().x() * 16 + localX, y, chunk.getPos().z() * 16 + localZ);
@@ -225,18 +146,8 @@ public class ForgeTerraHandler {
         }
 
         @Override
-        public boolean isSolid(int localX, int y, int localZ) {
-            return level.getBlockState(localToWorld(localX, y, localZ)).isSolid();
-        }
-
-        @Override
-        public boolean isWaterAtWorld(int worldX, int y, int worldZ) {
-            return level.getBlockState(new BlockPos(worldX, y, worldZ)).is(Blocks.WATER);
-        }
-
-        @Override
-        public boolean isBubbleColumnAtWorld(int worldX, int y, int worldZ) {
-            return level.getBlockState(new BlockPos(worldX, y, worldZ)).is(Blocks.BUBBLE_COLUMN);
+        public int getBlockTypeAtWorld(int worldX, int y, int worldZ) {
+            return blockStateToType(level.getBlockState(new BlockPos(worldX, y, worldZ)));
         }
 
         @Override public int getChunkX() { return chunk.getPos().x(); }
@@ -245,10 +156,8 @@ public class ForgeTerraHandler {
         private static int blockStateToType(BlockState state) {
             if (state.is(Blocks.WATER)) return BLOCK_WATER;
             if (state.is(Blocks.BUBBLE_COLUMN)) return BLOCK_BUBBLE_COLUMN;
-            if (state.is(BLUE_CONCRETE)) return BLOCK_BLUE_CONCRETE;
             if (state.is(Blocks.SOUL_SAND)) return BLOCK_SOUL_SAND;
             if (state.is(Blocks.BEDROCK)) return BLOCK_BEDROCK;
-            if (state.is(Blocks.CHEST)) return BLOCK_CHEST;
             if (state.isAir()) return BLOCK_AIR;
             return BLOCK_OTHER;
         }
@@ -257,10 +166,8 @@ public class ForgeTerraHandler {
             return switch (type) {
                 case BLOCK_WATER -> Blocks.WATER.defaultBlockState();
                 case BLOCK_BUBBLE_COLUMN -> Blocks.BUBBLE_COLUMN.defaultBlockState();
-                case BLOCK_BLUE_CONCRETE -> BLUE_CONCRETE.defaultBlockState();
                 case BLOCK_SOUL_SAND -> Blocks.SOUL_SAND.defaultBlockState();
                 case BLOCK_BEDROCK -> Blocks.BEDROCK.defaultBlockState();
-                case BLOCK_CHEST -> Blocks.CHEST.defaultBlockState();
                 default -> Blocks.AIR.defaultBlockState();
             };
         }
