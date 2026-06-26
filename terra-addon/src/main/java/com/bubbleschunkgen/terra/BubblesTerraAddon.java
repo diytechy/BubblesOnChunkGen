@@ -97,7 +97,6 @@ public class BubblesTerraAddon implements AddonInitializer {
                     } catch (Exception e) {
                         // Already registered for this pack, or registry unavailable - ignore.
                     }
-                })
-                .failThrough();
+                });
     }
 }

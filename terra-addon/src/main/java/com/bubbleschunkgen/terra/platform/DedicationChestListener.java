@@ -42,8 +42,7 @@ public abstract class DedicationChestListener {
                 .register(addon, LootPopulateEvent.class)
                 .then(event -> {
                     if (isDedicationStructure(event)) injectBook(event);
-                })
-                .failThrough();
+                });
         LOGGER.info("[Bubbles] Registered dedication-chest loot listener ({}).", platformName());
     }
 
