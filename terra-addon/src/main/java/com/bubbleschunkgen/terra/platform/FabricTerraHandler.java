@@ -72,12 +72,13 @@ public class FabricTerraHandler {
         });
 
         net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents.BEFORE.register((world, player, pos, state, entity) -> {
-            if (!(world instanceof ServerLevel) || !isChimeraWorld((ServerLevel) world)) return true;
+            if (!(world instanceof ServerLevel serverLevel) || !isChimeraWorld(serverLevel)) return true;
             if (state.is(Blocks.SOUL_SAND)) {
                 if (flowBlocker.isProtectedSoulSand(pos.getX(), pos.getY(), pos.getZ())) {
-                    if (!player.hasPermissions(2)) {
-                        return false;
-                    }
+                    if (!(player instanceof net.minecraft.server.level.ServerPlayer sp)) return false;
+                    com.mojang.authlib.GameProfile profile = sp.getGameProfile();
+                    net.minecraft.server.players.NameAndId nameAndId = new net.minecraft.server.players.NameAndId(profile.id(), profile.name());
+                    if (!serverLevel.getServer().getPlayerList().isOp(nameAndId)) return false;
                 }
             }
             return true;

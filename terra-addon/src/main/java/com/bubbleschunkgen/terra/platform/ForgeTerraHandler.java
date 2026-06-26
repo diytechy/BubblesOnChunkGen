@@ -10,7 +10,6 @@ import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.level.ChunkEvent;
-import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,7 +53,7 @@ public class ForgeTerraHandler {
         NeoForge.EVENT_BUS.addListener(this::onChunkLoad);
         NeoForge.EVENT_BUS.addListener(this::onChunkUnload);
         NeoForge.EVENT_BUS.addListener(this::onServerTick);
-        NeoForge.EVENT_BUS.addListener(this::onBlockBreak);
+        NeoForge.EVENT_BUS.addListener(this::onBreakEvent);
     }
 
     private void onChunkLoad(ChunkEvent.Load event) {
@@ -65,16 +64,17 @@ public class ForgeTerraHandler {
         logic.onChunkLoad(new ForgeBlockAccess(levelChunk, serverLevel));
     }
 
-    private void onBlockBreak(BlockEvent.BreakEvent event) {
+    private void onBreakEvent(net.neoforged.neoforge.event.level.block.BreakBlockEvent event) {
         if (!(event.getLevel() instanceof ServerLevel serverLevel)) return;
         if (!isChimeraWorld(serverLevel)) return;
-        
-        if (event.getState().is(Blocks.SOUL_SAND)) {
-            BlockPos pos = event.getPos();
-            if (flowBlocker.isProtectedSoulSand(pos.getX(), pos.getY(), pos.getZ())) {
-                if (!event.getPlayer().hasPermissions(2)) {
-                    event.setCanceled(true);
-                }
+        if (!event.getState().is(Blocks.SOUL_SAND)) return;
+        BlockPos pos = event.getPos();
+        if (flowBlocker.isProtectedSoulSand(pos.getX(), pos.getY(), pos.getZ())) {
+            if (!(event.getPlayer() instanceof net.minecraft.server.level.ServerPlayer sp)) return;
+            com.mojang.authlib.GameProfile profile = sp.getGameProfile();
+            net.minecraft.server.players.NameAndId nameAndId = new net.minecraft.server.players.NameAndId(profile.id(), profile.name());
+            if (!serverLevel.getServer().getPlayerList().isOp(nameAndId)) {
+                event.setCanceled(true);
             }
         }
     }

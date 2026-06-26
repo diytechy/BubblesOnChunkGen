@@ -172,14 +172,32 @@ public class BukkitTerraHandler implements Listener {
     }
 
     @EventHandler(ignoreCancelled = true)
-    public void onWaterFlow(BlockFromToEvent event) {
+    public void onBlockForm(org.bukkit.event.block.BlockFormEvent event) {
         if (!isChimeraWorld(event.getBlock().getWorld())) return;
-        Block from = event.getBlock();
-        Block to = event.getToBlock();
-        if (flowBlocker.shouldBlockFlow(
-                from.getX(), from.getY(), from.getZ(),
-                to.getX(), to.getY(), to.getZ())) {
-            event.setCancelled(true);
+        Block block = event.getBlock();
+
+        if (event.getNewState().getType() == Material.WATER) {
+            Levelled waterData = (Levelled) event.getNewState().getBlockData();
+            if (waterData.getLevel() == 0) { // level 0 is a source block
+                if (!flowBlocker.canFormSource(block.getX(), block.getY(), block.getZ())) {
+                    event.setCancelled(true);
+                }
+            }
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onBlockBreak(org.bukkit.event.block.BlockBreakEvent event) {
+        if (!isChimeraWorld(event.getBlock().getWorld())) return;
+        Block block = event.getBlock();
+
+        if (block.getType() == Material.SOUL_SAND) {
+            if (flowBlocker.isProtectedSoulSand(block.getX(), block.getY(), block.getZ())) {
+                org.bukkit.entity.Player player = event.getPlayer();
+                if (!player.isOp()) {
+                    event.setCancelled(true);
+                }
+            }
         }
     }
 
