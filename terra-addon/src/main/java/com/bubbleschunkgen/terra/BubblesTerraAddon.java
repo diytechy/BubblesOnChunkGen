@@ -95,20 +95,18 @@ public class BubblesTerraAddon implements AddonInitializer {
                     var pack = event.getPack().getRegistryKey();
                     try {
                         var registry = event.getPack().getOrCreateRegistry(LootTable.class);
-                        LOGGER.info("[loot] PostLoad for pack {} -> LootTable registry {} (identity {}), already-present={}",
-                                pack, System.identityHashCode(registry),
-                                registry.keys(), registry.contains(key));
                         if (!registry.contains(key)) {
                             registry.register(key, new DedicationLootTable(platform));
+                            LOGGER.info("Registered loot table {} into pack {}", key, pack);
                         }
-                        // Read back through the *same* registry handle to confirm the
-                        // entry is resolvable exactly as LootFunction will resolve it.
-                        LOGGER.info("[loot] After register: {} present={} keys={}",
-                                key, registry.get(key).isPresent(), registry.keys());
                     } catch (Exception e) {
-                        LOGGER.error("[loot] Failed to register dedication loot table {} into pack {}",
-                                key, pack, e);
+                        LOGGER.error("Failed to register dedication loot table {} into pack {}", key, pack, e);
                     }
-                });
+                })
+                // ConfigPackPostLoadEvent is a PackEvent, and Terra only dispatches PackEvents
+                // to a handler if the handler is global OR the pack declares this addon as a
+                // dependency (FunctionalEventHandlerImpl#handle). CHIMERA invokes our loot table
+                // without declaring us, so we must register globally to fire for every pack.
+                .global();
     }
 }

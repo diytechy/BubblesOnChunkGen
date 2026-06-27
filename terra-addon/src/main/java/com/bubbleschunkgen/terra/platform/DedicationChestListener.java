@@ -42,7 +42,11 @@ public abstract class DedicationChestListener {
                 .register(addon, LootPopulateEvent.class)
                 .then(event -> {
                     if (isDedicationStructure(event)) injectBook(event);
-                });
+                })
+                // LootPopulateEvent is a PackEvent: without global() Terra only dispatches it
+                // to handlers whose addon the pack declares as a dependency. CHIMERA does not
+                // declare us, so register globally or the book is never injected.
+                .global();
         LOGGER.info("[Bubbles] Registered dedication-chest loot listener ({}).", platformName());
     }
 
