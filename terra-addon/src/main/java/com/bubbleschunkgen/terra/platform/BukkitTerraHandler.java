@@ -198,6 +198,23 @@ public class BukkitTerraHandler implements Listener {
         }
     }
 
+    /**
+     * Pins a frozen water block at its current level. The in-place "infinite water"
+     * conversion (a flowing block beside two sources turning into a source) and the
+     * decay of unsupported flowing water both change a block's own fluid level
+     * <em>without</em> a {@link BlockFromToEvent} or {@link org.bukkit.event.block.BlockFormEvent} —
+     * they surface here, as a {@link org.bukkit.event.block.FluidLevelChangeEvent}. Cancelling
+     * it for a frozen coordinate keeps the transition water exactly as generated.
+     */
+    @EventHandler(ignoreCancelled = true)
+    public void onFluidLevelChange(org.bukkit.event.block.FluidLevelChangeEvent event) {
+        if (!isChimeraWorld(event.getBlock().getWorld())) return;
+        Block block = event.getBlock();
+        if (!flowBlocker.canFormSource(block.getX(), block.getY(), block.getZ())) {
+            event.setCancelled(true);
+        }
+    }
+
     @EventHandler(ignoreCancelled = true)
     public void onBlockBreak(org.bukkit.event.block.BlockBreakEvent event) {
         if (!isChimeraWorld(event.getBlock().getWorld())) return;

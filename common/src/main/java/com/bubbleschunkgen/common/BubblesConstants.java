@@ -7,8 +7,13 @@ public final class BubblesConstants {
     public static final int MIN_Y = 45;
     public static final int MAX_Y = 165;
 
-    /** Tick delay between a chunk load and column processing (lets generation settle). */
-    public static final long PROCESS_DELAY_TICKS = 5L;
+    /**
+     * Tick delay between a chunk load and column processing. Kept at 0 so the per-block
+     * freeze is applied before fluid settling converts the transition water (a flowing
+     * block beside two sources becomes a source within a tick or two). The chunk-wide
+     * freeze set on chunk load covers the brief gap until processing runs.
+     */
+    public static final long PROCESS_DELAY_TICKS = 0L;
 
     // Block type constants used by BlockAccess
     public static final int BLOCK_AIR = 0;
