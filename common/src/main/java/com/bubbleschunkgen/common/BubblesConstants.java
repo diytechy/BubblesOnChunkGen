@@ -10,10 +10,6 @@ public final class BubblesConstants {
     /** Tick delay between a chunk load and column processing (lets generation settle). */
     public static final long PROCESS_DELAY_TICKS = 5L;
 
-    public static final int[][] SIDE_OFFSETS = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
-
-
-
     // Block type constants used by BlockAccess
     public static final int BLOCK_AIR = 0;
     public static final int BLOCK_WATER = 1;

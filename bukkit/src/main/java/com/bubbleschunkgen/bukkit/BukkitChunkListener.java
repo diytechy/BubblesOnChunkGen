@@ -11,6 +11,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockFormEvent;
 import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockFromToEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.event.world.ChunkUnloadEvent;
 import org.bukkit.entity.Player;
@@ -77,6 +78,18 @@ public class BukkitChunkListener implements Listener {
         if (!isTerraWorld(event.getChunk().getWorld())) return;
         Chunk chunk = event.getChunk();
         logic.onChunkUnload(chunk.getX(), chunk.getZ());
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onBlockFromTo(BlockFromToEvent event) {
+        if (!isTerraWorld(event.getBlock().getWorld())) return;
+        Block from = event.getBlock();
+        Block to = event.getToBlock();
+
+        if (from.getType() == Material.WATER
+                && !flowBlocker.canFlow(from.getX(), from.getY(), from.getZ(), to.getX(), to.getY(), to.getZ())) {
+            event.setCancelled(true);
+        }
     }
 
     @EventHandler(ignoreCancelled = true)

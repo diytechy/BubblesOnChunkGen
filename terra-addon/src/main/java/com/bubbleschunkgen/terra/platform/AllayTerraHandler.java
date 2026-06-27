@@ -75,8 +75,9 @@ public class AllayTerraHandler {
     }
 
     private void onLiquidFlow(LiquidFlowEvent event) {
+        var from = event.getBlock().getPosition();
         var into = event.getInto();
-        if (!flowBlocker.canFormSource(into.x(), into.y(), into.z())) {
+        if (!flowBlocker.canFlow(from.x(), from.y(), from.z(), into.x(), into.y(), into.z())) {
             event.setCancelled(true);
         }
     }

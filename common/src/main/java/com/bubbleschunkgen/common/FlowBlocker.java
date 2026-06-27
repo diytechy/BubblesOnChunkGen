@@ -10,16 +10,25 @@ import java.util.Set;
 import static com.bubbleschunkgen.common.BubblesConstants.*;
 
 /**
- * Tracks coordinates of soul sand and water columns to prevent source block
- * formation and block breaking (anti-griefing). Thread-safe enough for
- * single-threaded server tick usage.
+ * Tracks coordinates of soul sand and frozen water to prevent flow and block
+ * breaking (anti-griefing). Thread-safe enough for single-threaded server tick
+ * usage.
  */
 public class FlowBlocker {
 
     private final Set<Long> protectedSoulSand = new HashSet<>();
-    private final Set<Long> protectedWaterColumns = new HashSet<>();
+    private final Set<Long> frozenWater = new HashSet<>();
+    private final Set<Long> frozenChunks = new HashSet<>();
     private final Map<Long, List<Long>> soulsandByChunk = new HashMap<>();
     private final Map<Long, List<Long>> waterByChunk = new HashMap<>();
+
+    public void freezeChunk(long chunkKey) {
+        frozenChunks.add(chunkKey);
+    }
+
+    public void unfreezeChunk(long chunkKey) {
+        frozenChunks.remove(chunkKey);
+    }
 
     public void addProtectedSoulSand(long chunkKey, int worldX, int y, int worldZ) {
         long bk = coordKey(worldX, y, worldZ);
@@ -27,20 +36,21 @@ public class FlowBlocker {
         soulsandByChunk.computeIfAbsent(chunkKey, k -> new ArrayList<>()).add(bk);
     }
 
-    public void addProtectedWaterColumn(long chunkKey, int worldX, int y, int worldZ) {
+    public void addFrozenWater(long chunkKey, int worldX, int y, int worldZ) {
         long bk = coordKey(worldX, y, worldZ);
-        protectedWaterColumns.add(bk);
+        frozenWater.add(bk);
         waterByChunk.computeIfAbsent(chunkKey, k -> new ArrayList<>()).add(bk);
     }
 
     public void removeChunk(long chunkKey) {
+        frozenChunks.remove(chunkKey);
         List<Long> ssCoords = soulsandByChunk.remove(chunkKey);
         if (ssCoords != null) {
             protectedSoulSand.removeAll(ssCoords);
         }
         List<Long> waterCoords = waterByChunk.remove(chunkKey);
         if (waterCoords != null) {
-            protectedWaterColumns.removeAll(waterCoords);
+            frozenWater.removeAll(waterCoords);
         }
     }
 
@@ -52,20 +62,30 @@ public class FlowBlocker {
     }
 
     /**
-     * Checks if a new source block can form at the given coordinates.
-     * Source blocks are prevented from forming adjacent to protected water columns.
+     * Checks if water is allowed to flow between two coordinates.
+     * Flow is blocked while either chunk is being scanned, or when either side of
+     * the flow is a frozen water block.
      */
-    public boolean canFormSource(int x, int y, int z) {
-        if (protectedWaterColumns.isEmpty()) return true;
-
-        for (int[] offset : SIDE_OFFSETS) {
-            int nx = x + offset[0];
-            int nz = z + offset[1];
-            if (protectedWaterColumns.contains(coordKey(nx, y, nz))) {
+    public boolean canFlow(int fromX, int fromY, int fromZ, int toX, int toY, int toZ) {
+        if (!frozenChunks.isEmpty()) {
+            if (frozenChunks.contains(chunkKey(fromX >> 4, fromZ >> 4))
+                    || frozenChunks.contains(chunkKey(toX >> 4, toZ >> 4))) {
                 return false;
             }
         }
-        return true;
+
+        if (frozenWater.isEmpty()) return true;
+
+        return !frozenWater.contains(coordKey(fromX, fromY, fromZ))
+                && !frozenWater.contains(coordKey(toX, toY, toZ));
+    }
+
+    /**
+     * Compatibility check for source-form events on platforms that expose them.
+     */
+    public boolean canFormSource(int x, int y, int z) {
+        return !frozenChunks.contains(chunkKey(x >> 4, z >> 4))
+                && !frozenWater.contains(coordKey(x, y, z));
     }
 
     /**

@@ -172,6 +172,18 @@ public class BukkitTerraHandler implements Listener {
     }
 
     @EventHandler(ignoreCancelled = true)
+    public void onBlockFromTo(BlockFromToEvent event) {
+        if (!isChimeraWorld(event.getBlock().getWorld())) return;
+        Block from = event.getBlock();
+        Block to = event.getToBlock();
+
+        if (from.getType() == Material.WATER
+                && !flowBlocker.canFlow(from.getX(), from.getY(), from.getZ(), to.getX(), to.getY(), to.getZ())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
     public void onBlockForm(org.bukkit.event.block.BlockFormEvent event) {
         if (!isChimeraWorld(event.getBlock().getWorld())) return;
         Block block = event.getBlock();

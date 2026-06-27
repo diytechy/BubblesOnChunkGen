@@ -3,6 +3,7 @@ package com.bubbleschunkgen.terra.mixin;
 import com.bubbleschunkgen.common.FlowBlocker;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FlowingFluid;
@@ -13,8 +14,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Cancels water spread when the resulting block would become a source block
- * in a protected column area. Safe no-op when no FlowBlocker has been installed.
+ * Cancels water spread to or from frozen water coordinates. Safe no-op when no
+ * FlowBlocker has been installed.
  */
 @Mixin(FlowingFluid.class)
 public class FlowableFluidMixin {
@@ -24,8 +25,10 @@ public class FlowableFluidMixin {
                                     Direction direction, FluidState fluidState, CallbackInfo ci) {
         FlowBlocker blocker = FlowBlocker.getGlobalInstance();
         if (blocker == null) return;
+        if (!fluidState.is(FluidTags.WATER)) return;
 
-        if (fluidState.isSource() && !blocker.canFormSource(pos.getX(), pos.getY(), pos.getZ())) {
+        BlockPos source = direction == null ? pos : pos.relative(direction.getOpposite());
+        if (!blocker.canFlow(source.getX(), source.getY(), source.getZ(), pos.getX(), pos.getY(), pos.getZ())) {
             ci.cancel();
         }
     }
