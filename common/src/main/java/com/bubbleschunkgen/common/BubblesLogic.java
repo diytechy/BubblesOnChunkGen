@@ -54,15 +54,15 @@ public class BubblesLogic {
         try {
             for (int x = 0; x < 16; x++) {
                 for (int z = 0; z < 16; z++) {
+                    int worldX = chunk.getChunkX() * 16 + x;
+                    int worldZ = chunk.getChunkZ() * 16 + z;
                     for (int y = MIN_Y - 1; y <= MAX_Y; y++) {
                         if (chunk.getBlockType(x, y, z) != BLOCK_SOUL_SAND) continue;
 
-                        int worldX = chunk.getChunkX() * 16 + x;
-                        int worldZ = chunk.getChunkZ() * 16 + z;
 
                         flowBlocker.addProtectedSoulSand(ck, worldX, y, worldZ);
                         protectedSoulSand++;
-                        frozenWater += freezeLevelOneWaterAbove(chunk, ck, x, y, z, worldX, worldZ);
+                        frozenWater += freezeFlowingWaterAbove(chunk, ck, x, y, z, worldX, worldZ);
                         break;
                     }
                 }
@@ -79,18 +79,42 @@ public class BubblesLogic {
     }
 
     /**
-     * Walks up from the soul sand until the first non-water block. Level 1 water
-     * is frozen so it cannot receive or produce flow.
+     * Walks up the column above the soul sand and freezes every non-source
+     * (flowing) water block so it cannot receive or produce flow. The scan passes
+     * straight through {@code bubble_column} blocks (soul sand under water turns
+     * the submerged column into {@code minecraft:bubble_column}, not water) and
+     * through full source water, stopping at the first air/solid block, which is
+     * the surface.
+     *
+     * <p>Water levels are vanilla blockstate values: {@code level=0} is a full
+     * source block; {@code level=1..7} are flowing, with {@code 7} the thinnest
+     * ("lowest") water.
      */
-    private int freezeLevelOneWaterAbove(BlockAccess chunk, long ck, int x, int soulSandY, int z, int worldX, int worldZ) {
+    private int freezeFlowingWaterAbove(BlockAccess chunk, long ck, int x, int soulSandY, int z, int worldX, int worldZ) {
         int frozen = 0;
         for (int y = soulSandY + 1; y <= MAX_Y; y++) {
             int type = chunk.getBlockType(x, y, z);
+
+            // The submerged column is bubble_column; keep scanning upward through it.
+            if (type == BLOCK_BUBBLE_COLUMN) {
+                if (bridge.isDebug()) {
+                    bridge.log("  column [" + worldX + "," + y + "," + worldZ + "] = bubble_column");
+                }
+                continue;
+            }
+
             if (type != BLOCK_WATER) {
+                if (bridge.isDebug()) {
+                    bridge.log("  column [" + worldX + "," + y + "," + worldZ + "] = type " + type + " (surface, stop)");
+                }
                 break;
             }
 
-            if (chunk.getWaterLevel(x, y, z) == 1) {
+            int level = chunk.getWaterLevel(x, y, z);
+            if (bridge.isDebug()) {
+                bridge.log("  column [" + worldX + "," + y + "," + worldZ + "] = water level " + level);
+            }
+            if (level != 0) {
                 flowBlocker.addFrozenWater(ck, worldX, y, worldZ);
                 frozen++;
             }

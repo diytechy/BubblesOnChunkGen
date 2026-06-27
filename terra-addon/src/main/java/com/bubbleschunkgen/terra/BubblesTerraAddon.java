@@ -5,7 +5,7 @@ import com.bubbleschunkgen.terra.platform.PlatformDetector;
 import com.dfsek.terra.addons.manifest.api.AddonInitializer;
 import com.dfsek.terra.api.Platform;
 import com.dfsek.terra.api.addon.BaseAddon;
-import com.dfsek.terra.api.event.events.config.pack.ConfigPackPreLoadEvent;
+import com.dfsek.terra.api.event.events.config.pack.ConfigPackPostLoadEvent;
 import com.dfsek.terra.api.event.functional.FunctionalEventHandler;
 import com.dfsek.terra.api.inject.annotations.Inject;
 import com.dfsek.terra.api.structure.LootTable;
@@ -89,13 +89,25 @@ public class BubblesTerraAddon implements AddonInitializer {
     private void registerDedicationLootTable() {
         platform.getEventManager()
                 .getHandler(FunctionalEventHandler.class)
-                .register(addon, ConfigPackPreLoadEvent.class)
+                .register(addon, ConfigPackPostLoadEvent.class)
                 .then(event -> {
+                    var key = addon.key("dedication");
+                    var pack = event.getPack().getRegistryKey();
                     try {
-                        event.getPack().getOrCreateRegistry(LootTable.class)
-                                .register(addon.key("dedication"), new DedicationLootTable(platform));
+                        var registry = event.getPack().getOrCreateRegistry(LootTable.class);
+                        LOGGER.info("[loot] PostLoad for pack {} -> LootTable registry {} (identity {}), already-present={}",
+                                pack, System.identityHashCode(registry),
+                                registry.keys(), registry.contains(key));
+                        if (!registry.contains(key)) {
+                            registry.register(key, new DedicationLootTable(platform));
+                        }
+                        // Read back through the *same* registry handle to confirm the
+                        // entry is resolvable exactly as LootFunction will resolve it.
+                        LOGGER.info("[loot] After register: {} present={} keys={}",
+                                key, registry.get(key).isPresent(), registry.keys());
                     } catch (Exception e) {
-                        // Already registered for this pack, or registry unavailable - ignore.
+                        LOGGER.error("[loot] Failed to register dedication loot table {} into pack {}",
+                                key, pack, e);
                     }
                 });
     }
