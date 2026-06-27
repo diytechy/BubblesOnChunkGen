@@ -66,5 +66,25 @@ In bubbles in chunk gen, we only
 
 block(0, 0, 0, "minecraft:water[level=7]", true);
 
-
 Direction 1:
+
+All the recent changes in this branch (Remove-blue-concrete-replacement) were intended to update this Terra add-on so that it no longer needs to place blocks as a part of of the add-on itself.  This appears to be working but it exposed some limitations of the updates that need to be reverted.
+
+Previously, this plugin prevented water flow from certain blocks.  This was removed, but needs to be reintroduced.
+
+Please carefully update this addon to change how it operates:
+
+1. Continue to provide the loot definition for the dedication chest.
+2. Continue to keep the y-scan range identical to what it is today.
+3. Make sure the chunk is completely frozen (not allowed to tick) until all freezes that this addon sets are in place.
+4. Continue to prevent soul sand from being deystroyed unless the user is an operator.
+5. Instead of preventing water source blocks from being generated from adjacent blocks above soul sand as is done today, just prevent flow (to or from) and water level 1 blocks that are found above a soul sand.  The scan would end once air is reached.
+
+The total flow would then be:
+1. Scan the chunk first the x/z coordinates (255 total per chunk)
+2. For each coordinate, scan upward in the y range.  
+3. Once soul-sand is found, lock it from being broken by non-op players, and then continue to scan upward.  This should be similar to today.  Once soul-sand is found, all continuous water above that has the lowest water level should be locked.
+3a. Continue scanning upward, if any water blocks with the lowest water level (water level 1) are found, lock them from receiving / producing flow.
+3b. As the scan upward continues, after soul-sand is found, any non-water block above  the soul sand (in the same column) will trigger an early exit to the next coordinate.
+
+Note: The entire chunk should be frozen until it is searched and soulsand is protected and flow is frozen.
