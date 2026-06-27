@@ -4,6 +4,7 @@ import com.bubbleschunkgen.common.*;
 import org.allaymc.api.block.property.type.BlockPropertyTypes;
 import org.allaymc.api.block.type.BlockState;
 import org.allaymc.api.block.type.BlockTypes;
+import org.allaymc.api.eventbus.event.block.LiquidDecayEvent;
 import org.allaymc.api.eventbus.event.block.LiquidFlowEvent;
 import org.allaymc.api.eventbus.event.world.ChunkLoadEvent;
 import org.allaymc.api.eventbus.event.world.ChunkUnloadEvent;
@@ -63,6 +64,7 @@ public class AllayTerraHandler {
         bus.registerListenerFor(ChunkLoadEvent.class, this::onChunkLoad);
         bus.registerListenerFor(ChunkUnloadEvent.class, this::onChunkUnload);
         bus.registerListenerFor(LiquidFlowEvent.class, this::onLiquidFlow);
+        bus.registerListenerFor(LiquidDecayEvent.class, this::onLiquidDecay);
     }
 
     private void onChunkLoad(ChunkLoadEvent event) {
@@ -78,6 +80,19 @@ public class AllayTerraHandler {
         var from = event.getBlock().getPosition();
         var into = event.getInto();
         if (!flowBlocker.canFlow(from.x(), from.y(), from.z(), into.x(), into.y(), into.z())) {
+            event.setCancelled(true);
+        }
+    }
+
+    /**
+     * Keeps a frozen liquid from decaying away (the Bedrock analog of Java water
+     * dissipating). Bedrock has no dedicated in-place source-conversion event, and
+     * its fluid mechanics differ from Java, so the full parity of the other
+     * platforms is not guaranteed here — verify on a real Allay server.
+     */
+    private void onLiquidDecay(LiquidDecayEvent event) {
+        var pos = event.getBlock().getPosition();
+        if (!flowBlocker.canFormSource(pos.x(), pos.y(), pos.z())) {
             event.setCancelled(true);
         }
     }
