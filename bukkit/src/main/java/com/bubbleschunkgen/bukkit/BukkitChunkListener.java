@@ -5,18 +5,17 @@ import org.bukkit.Chunk;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
-import org.bukkit.block.Chest;
 import org.bukkit.block.data.Levelled;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.BlockFormEvent;
+import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockFromToEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.event.world.ChunkUnloadEvent;
+import org.bukkit.entity.Player;
 import org.bukkit.generator.ChunkGenerator;
-import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.BookMeta;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -53,28 +52,6 @@ public class BukkitChunkListener implements Listener {
             public void runDelayed(Runnable task, long ticks) {
                 plugin.getServer().getScheduler().runTaskLater(plugin, task, ticks);
             }
-
-            @Override
-            public void fillDedicationChest(BlockAccess chunk, int localX, int y, int localZ) {
-                Chunk bukkitChunk = plugin.getServer().getWorlds().get(0)
-                        .getChunkAt(chunk.getChunkX(), chunk.getChunkZ());
-                Block chestBlock = bukkitChunk.getBlock(localX, y, localZ);
-                if (chestBlock.getType() != Material.CHEST) return;
-
-                Chest chest = (Chest) chestBlock.getState();
-                Inventory inv = chest.getInventory();
-
-                ItemStack book = new ItemStack(Material.WRITTEN_BOOK);
-                BookMeta meta = (BookMeta) book.getItemMeta();
-                meta.setTitle("CHIMERA");
-                meta.setAuthor("CHIMERA");
-                meta.addPage("CHIMERA\n\nDedicated to Finnian and Armin");
-                book.setItemMeta(meta);
-
-                inv.setItem(0, book);
-                inv.setItem(1, new ItemStack(Material.EMERALD, 6));
-                inv.setItem(2, new ItemStack(Material.DIAMOND, 7));
-            }
         };
 
         this.logic = new BubblesLogic(bridge, flowBlocker);
@@ -93,12 +70,7 @@ public class BukkitChunkListener implements Listener {
         Chunk chunk = event.getChunk();
         if (!isTerraWorld(chunk.getWorld())) return;
 
-        BukkitBlockAccess access = new BukkitBlockAccess(chunk);
-        if (event.isNewChunk()) {
-            logic.onNewChunkLoad(access);
-        } else {
-            logic.onExistingChunkLoad(access);
-        }
+        logic.onChunkLoad(new BukkitBlockAccess(chunk));
     }
 
     @EventHandler
@@ -109,15 +81,44 @@ public class BukkitChunkListener implements Listener {
     }
 
     @EventHandler(ignoreCancelled = true)
-    public void onWaterFlow(BlockFromToEvent event) {
+    public void onBlockFromTo(BlockFromToEvent event) {
         if (!isTerraWorld(event.getBlock().getWorld())) return;
         Block from = event.getBlock();
         Block to = event.getToBlock();
 
-        if (flowBlocker.shouldBlockFlow(
-                from.getX(), from.getY(), from.getZ(),
-                to.getX(), to.getY(), to.getZ())) {
+        if (from.getType() == Material.WATER
+                && !flowBlocker.canFlow(from.getX(), from.getY(), from.getZ(), to.getX(), to.getY(), to.getZ())) {
             event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onBlockForm(BlockFormEvent event) {
+        if (!isTerraWorld(event.getBlock().getWorld())) return;
+        Block block = event.getBlock();
+
+        if (event.getNewState().getType() == Material.WATER) {
+            Levelled waterData = (Levelled) event.getNewState().getBlockData();
+            if (waterData.getLevel() == 0) { // level 0 is a source block
+                if (!flowBlocker.canFormSource(block.getX(), block.getY(), block.getZ())) {
+                    event.setCancelled(true);
+                }
+            }
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onBlockBreak(BlockBreakEvent event) {
+        if (!isTerraWorld(event.getBlock().getWorld())) return;
+        Block block = event.getBlock();
+
+        if (block.getType() == Material.SOUL_SAND) {
+            if (flowBlocker.isProtectedSoulSand(block.getX(), block.getY(), block.getZ())) {
+                Player player = event.getPlayer();
+                if (!player.isOp()) {
+                    event.setCancelled(true);
+                }
+            }
         }
     }
 
@@ -157,18 +158,8 @@ public class BukkitChunkListener implements Listener {
         }
 
         @Override
-        public boolean isSolid(int localX, int y, int localZ) {
-            return chunk.getBlock(localX, y, localZ).getType().isSolid();
-        }
-
-        @Override
-        public boolean isWaterAtWorld(int worldX, int y, int worldZ) {
-            return chunk.getWorld().getBlockAt(worldX, y, worldZ).getType() == Material.WATER;
-        }
-
-        @Override
-        public boolean isBubbleColumnAtWorld(int worldX, int y, int worldZ) {
-            return chunk.getWorld().getBlockAt(worldX, y, worldZ).getType() == Material.BUBBLE_COLUMN;
+        public int getBlockTypeAtWorld(int worldX, int y, int worldZ) {
+            return materialToType(chunk.getWorld().getBlockAt(worldX, y, worldZ).getType());
         }
 
         @Override
@@ -181,10 +172,8 @@ public class BukkitChunkListener implements Listener {
             return switch (mat) {
                 case WATER -> BLOCK_WATER;
                 case BUBBLE_COLUMN -> BLOCK_BUBBLE_COLUMN;
-                case BLUE_CONCRETE -> BLOCK_BLUE_CONCRETE;
                 case SOUL_SAND -> BLOCK_SOUL_SAND;
                 case BEDROCK -> BLOCK_BEDROCK;
-                case CHEST -> BLOCK_CHEST;
                 case AIR, VOID_AIR, CAVE_AIR -> BLOCK_AIR;
                 default -> BLOCK_OTHER;
             };
@@ -194,10 +183,8 @@ public class BukkitChunkListener implements Listener {
             return switch (type) {
                 case BLOCK_WATER -> Material.WATER;
                 case BLOCK_BUBBLE_COLUMN -> Material.BUBBLE_COLUMN;
-                case BLOCK_BLUE_CONCRETE -> Material.BLUE_CONCRETE;
                 case BLOCK_SOUL_SAND -> Material.SOUL_SAND;
                 case BLOCK_BEDROCK -> Material.BEDROCK;
-                case BLOCK_CHEST -> Material.CHEST;
                 default -> Material.AIR;
             };
         }

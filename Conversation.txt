@@ -24,3 +24,67 @@ Can we actually make a compile time option to switch between 1.21.11 and 26.1?  
 
 
 Additionally, I would like to ensure this addon mechanism (freezing chunks and soulsand) only occurs for specifically the CHIMERA world generator.  Is that as simple as changing the generator check text to "chimera" instead of the generic "terra" that is currently implemented?
+
+############################
+Design shift:
+
+Explore some alternatives which may simplify the BubblesOnChunkGen plugin.  The core goal is to ensure water transitions correctly from a higher level to a lower level, and that bubble columns are available in such a way that boats can successfully traverse upwards to the next level (so that the higher level water does not sink the boat if it does not traverse from the top level)
+
+Alternatives for river water level transitions:
+
+ALT 1: Set L1 water using plugin directly (as is done today), requires tick during chunk load intercept.  Guarantees no flow issues. Already proven in paper Minecraft.  However, this does require the plugin to perform block placement, increasing chunk load latency.
+ALT 2: Set L1 water using Terra, plugin needs to prevent flow (or drying up of L1 water) before chunk ticks.  May not be possible.
+ALT 3: Don't set any L1 water at all.  Instead, for all soulsand, when air or non-source water is reached, just block that air block from becoming a source water block.  Water is still permitted to spread out, better creating a transition over the water elevation change, but perhaps to the detriment of slowing down boat travel at these points (since the water flow will push back against the boat's water traversal)
+
+Alternatives for dealing with bedrock / soulsand:
+
+ALT 1: Don't perform any blocks on soulsand at all.  If bedrock is detected without soulsand above, forcibly set soulsand above.  (Current implementation)
+ALT 2: When soulsand is found, use a method to prevent its destruction (excluding OP?). This way there does not need to be any recovery method at all.  Bedrock could potentially be excluded, but the benefit of bedrock is that it still uniquely identifies river lift locations.  Blocking soul sand also prevents players from accessing a material they are not meant to get till they enter the nether.
+
+I believe the ideal case here is ALT 3 for river water transitions and ALT 2 for bedrock / soulsand.  But it requires a method to block water source block creation from neighboring source water blocks, and it requires a method to prevent non-op players from destroying / breaking specifics blocks.  Explore options for implementing that alternative combination and verify appropriate platform support, and suggest alternative design structures.
+
+
+Wait, let's change this a little bit then.
+
+The full flow becomes:
+
+Scan the chunk within the defined y-range (Now from 45 to 245) from bottom to top
+At each y level, scan through the chunk (x,z):
+
+1. If bedrock is found with no bedrock above or below it, restore soulsand above assuming it was the location of a bubble column that had been grieved.
+2. If soul sand is found (might have been placed from previous y-level), set all adjacent columns as potential flow freezing columns.
+3. 
+
+CHIMERA CHANGE: 
+Add a structure feature to base and hydraxia_base that places black state 1 water blocks (lowest water level) whenever the river distance to uplift is less than the soulsand place distance (distributor), located when air is above a source block.
+
+Bubbles on chunk gen change:
+
+Instead of placing any blocks in this plugin, all it will do is provide a fill definition for the dedication chest (already done) and then prevent destruction of 
+
+In bubbles in chunk gen, we only 
+
+block(0, 0, 0, "minecraft:water[level=7]", true);
+
+Direction 1:
+
+All the recent changes in this branch (Remove-blue-concrete-replacement) were intended to update this Terra add-on so that it no longer needs to place blocks as a part of of the add-on itself.  This appears to be working but it exposed some limitations of the updates that need to be reverted.
+
+Previously, this plugin prevented water flow from certain blocks.  This was removed, but needs to be reintroduced.
+
+Please carefully update this addon to change how it operates:
+
+1. Continue to provide the loot definition for the dedication chest.
+2. Continue to keep the y-scan range identical to what it is today.
+3. Make sure the chunk is completely frozen (not allowed to tick) until all freezes that this addon sets are in place.
+4. Continue to prevent soul sand from being deystroyed unless the user is an operator.
+5. Instead of preventing water source blocks from being generated from adjacent blocks above soul sand as is done today, just prevent flow (to or from) and water level 1 blocks that are found above a soul sand.  The scan would end once air is reached.
+
+The total flow would then be:
+1. Scan the chunk first the x/z coordinates (255 total per chunk)
+2. For each coordinate, scan upward in the y range.  
+3. Once soul-sand is found, lock it from being broken by non-op players, and then continue to scan upward.  This should be similar to today.  Once soul-sand is found, all continuous water above that has the lowest water level should be locked.
+3a. Continue scanning upward, if any water blocks with the lowest water level (water level 1) are found, lock them from receiving / producing flow.
+3b. As the scan upward continues, after soul-sand is found, any non-water block above  the soul sand (in the same column) will trigger an early exit to the next coordinate.
+
+Note: The entire chunk should be frozen until it is searched and soulsand is protected and flow is frozen.

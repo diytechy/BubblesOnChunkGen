@@ -6,7 +6,6 @@ import org.bukkit.Chunk;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
-import org.bukkit.block.Chest;
 import org.bukkit.block.data.Levelled;
 import org.bukkit.command.CommandMap;
 import org.bukkit.command.CommandSender;
@@ -16,9 +15,6 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockFromToEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.event.world.ChunkUnloadEvent;
-import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.BookMeta;
 import org.bukkit.plugin.Plugin;
 
 import java.lang.reflect.Field;
@@ -85,28 +81,6 @@ public class BukkitTerraHandler implements Listener {
             @Override
             public void runDelayed(Runnable task, long ticks) {
                 Bukkit.getScheduler().runTaskLater(hostPlugin, task, ticks);
-            }
-
-            @Override
-            public void fillDedicationChest(BlockAccess chunk, int localX, int y, int localZ) {
-                Chunk bukkitChunk = Bukkit.getWorlds().get(0)
-                        .getChunkAt(chunk.getChunkX(), chunk.getChunkZ());
-                Block chestBlock = bukkitChunk.getBlock(localX, y, localZ);
-                if (chestBlock.getType() != Material.CHEST) return;
-
-                Chest chest = (Chest) chestBlock.getState();
-                Inventory inv = chest.getInventory();
-
-                ItemStack book = new ItemStack(Material.WRITTEN_BOOK);
-                BookMeta meta = (BookMeta) book.getItemMeta();
-                meta.setTitle("CHIMERA");
-                meta.setAuthor("CHIMERA");
-                meta.addPage("CHIMERA\n\nDedicated to Finnian and Armin");
-                book.setItemMeta(meta);
-
-                inv.setItem(0, book);
-                inv.setItem(1, new ItemStack(Material.EMERALD, 6));
-                inv.setItem(2, new ItemStack(Material.DIAMOND, 7));
             }
         };
 
@@ -187,12 +161,7 @@ public class BukkitTerraHandler implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onChunkLoad(ChunkLoadEvent event) {
         if (!isChimeraWorld(event.getChunk().getWorld())) return;
-        BukkitBlockAccess access = new BukkitBlockAccess(event.getChunk());
-        if (event.isNewChunk()) {
-            logic.onNewChunkLoad(access);
-        } else {
-            logic.onExistingChunkLoad(access);
-        }
+        logic.onChunkLoad(new BukkitBlockAccess(event.getChunk()));
     }
 
     @EventHandler
@@ -203,14 +172,61 @@ public class BukkitTerraHandler implements Listener {
     }
 
     @EventHandler(ignoreCancelled = true)
-    public void onWaterFlow(BlockFromToEvent event) {
+    public void onBlockFromTo(BlockFromToEvent event) {
         if (!isChimeraWorld(event.getBlock().getWorld())) return;
         Block from = event.getBlock();
         Block to = event.getToBlock();
-        if (flowBlocker.shouldBlockFlow(
-                from.getX(), from.getY(), from.getZ(),
-                to.getX(), to.getY(), to.getZ())) {
+
+        if (from.getType() == Material.WATER
+                && !flowBlocker.canFlow(from.getX(), from.getY(), from.getZ(), to.getX(), to.getY(), to.getZ())) {
             event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onBlockForm(org.bukkit.event.block.BlockFormEvent event) {
+        if (!isChimeraWorld(event.getBlock().getWorld())) return;
+        Block block = event.getBlock();
+
+        if (event.getNewState().getType() == Material.WATER) {
+            Levelled waterData = (Levelled) event.getNewState().getBlockData();
+            if (waterData.getLevel() == 0) { // level 0 is a source block
+                if (!flowBlocker.canFormSource(block.getX(), block.getY(), block.getZ())) {
+                    event.setCancelled(true);
+                }
+            }
+        }
+    }
+
+    /**
+     * Pins a frozen water block at its current level. The in-place "infinite water"
+     * conversion (a flowing block beside two sources turning into a source) and the
+     * decay of unsupported flowing water both change a block's own fluid level
+     * <em>without</em> a {@link BlockFromToEvent} or {@link org.bukkit.event.block.BlockFormEvent} —
+     * they surface here, as a {@link org.bukkit.event.block.FluidLevelChangeEvent}. Cancelling
+     * it for a frozen coordinate keeps the transition water exactly as generated.
+     */
+    @EventHandler(ignoreCancelled = true)
+    public void onFluidLevelChange(org.bukkit.event.block.FluidLevelChangeEvent event) {
+        if (!isChimeraWorld(event.getBlock().getWorld())) return;
+        Block block = event.getBlock();
+        if (!flowBlocker.canFormSource(block.getX(), block.getY(), block.getZ())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onBlockBreak(org.bukkit.event.block.BlockBreakEvent event) {
+        if (!isChimeraWorld(event.getBlock().getWorld())) return;
+        Block block = event.getBlock();
+
+        if (block.getType() == Material.SOUL_SAND) {
+            if (flowBlocker.isProtectedSoulSand(block.getX(), block.getY(), block.getZ())) {
+                org.bukkit.entity.Player player = event.getPlayer();
+                if (!player.isOp()) {
+                    event.setCancelled(true);
+                }
+            }
         }
     }
 
@@ -247,18 +263,8 @@ public class BukkitTerraHandler implements Listener {
         }
 
         @Override
-        public boolean isSolid(int localX, int y, int localZ) {
-            return chunk.getBlock(localX, y, localZ).getType().isSolid();
-        }
-
-        @Override
-        public boolean isWaterAtWorld(int worldX, int y, int worldZ) {
-            return chunk.getWorld().getBlockAt(worldX, y, worldZ).getType() == Material.WATER;
-        }
-
-        @Override
-        public boolean isBubbleColumnAtWorld(int worldX, int y, int worldZ) {
-            return chunk.getWorld().getBlockAt(worldX, y, worldZ).getType() == Material.BUBBLE_COLUMN;
+        public int getBlockTypeAtWorld(int worldX, int y, int worldZ) {
+            return materialToType(chunk.getWorld().getBlockAt(worldX, y, worldZ).getType());
         }
 
         @Override public int getChunkX() { return chunk.getX(); }
@@ -268,10 +274,8 @@ public class BukkitTerraHandler implements Listener {
             return switch (mat) {
                 case WATER -> BLOCK_WATER;
                 case BUBBLE_COLUMN -> BLOCK_BUBBLE_COLUMN;
-                case BLUE_CONCRETE -> BLOCK_BLUE_CONCRETE;
                 case SOUL_SAND -> BLOCK_SOUL_SAND;
                 case BEDROCK -> BLOCK_BEDROCK;
-                case CHEST -> BLOCK_CHEST;
                 case AIR, VOID_AIR, CAVE_AIR -> BLOCK_AIR;
                 default -> BLOCK_OTHER;
             };
@@ -281,10 +285,8 @@ public class BukkitTerraHandler implements Listener {
             return switch (type) {
                 case BLOCK_WATER -> Material.WATER;
                 case BLOCK_BUBBLE_COLUMN -> Material.BUBBLE_COLUMN;
-                case BLOCK_BLUE_CONCRETE -> Material.BLUE_CONCRETE;
                 case BLOCK_SOUL_SAND -> Material.SOUL_SAND;
                 case BLOCK_BEDROCK -> Material.BEDROCK;
-                case BLOCK_CHEST -> Material.CHEST;
                 default -> Material.AIR;
             };
         }

@@ -12,9 +12,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 import static com.bubbleschunkgen.common.BubblesConstants.*;
 
@@ -35,7 +33,6 @@ public class MinestomTerraHandler {
     private final FlowBlocker flowBlocker = new FlowBlocker();
     private final BubblesLogic logic;
     private final Map<UUID, Boolean> chimeraWorldCache = new HashMap<>();
-    private final Map<UUID, Set<Long>> seenChunks = new ConcurrentHashMap<>();
     private boolean debug = false;
 
     public MinestomTerraHandler() {
@@ -54,18 +51,6 @@ public class MinestomTerraHandler {
                         .delay(TaskSchedule.tick((int) ticks))
                         .schedule();
             }
-
-            @Override
-            public void fillDedicationChest(BlockAccess chunk, int localX, int y, int localZ) {
-                // Minestom doesn't have a built-in chest inventory tied to a placed block
-                // the way Bukkit/Fabric/Forge do. Placing the chest is enough for the
-                // marker; populating it would require the host app to attach an inventory
-                // handler. Left as a no-op rather than a half-implementation.
-                if (debug) {
-                    LOGGER.info("[Bubbles] Dedication chest placed at local [{},{},{}] in chunk [{},{}] (contents not populated on Minestom)",
-                            localX, y, localZ, chunk.getChunkX(), chunk.getChunkZ());
-                }
-            }
         };
 
         logic = new BubblesLogic(bridge, flowBlocker);
@@ -75,21 +60,7 @@ public class MinestomTerraHandler {
         MinecraftServer.getGlobalEventHandler().addListener(InstanceChunkLoadEvent.class, event -> {
             Instance instance = event.getInstance();
             if (!isChimeraInstance(instance)) return;
-
-            int cx = event.getChunkX();
-            int cz = event.getChunkZ();
-            long ck = chunkKey(cx, cz);
-            boolean firstSeen = seenChunks
-                    .computeIfAbsent(instance.getUuid(), u -> ConcurrentHashMap.newKeySet())
-                    .add(ck);
-
-            MinestomBlockAccess access = new MinestomBlockAccess(instance, cx, cz);
-
-            if (firstSeen && hasBlueConcrete(access)) {
-                logic.onNewChunkLoad(access);
-            } else {
-                logic.onExistingChunkLoad(access);
-            }
+            logic.onChunkLoad(new MinestomBlockAccess(instance, event.getChunkX(), event.getChunkZ()));
         });
 
         MinecraftServer.getGlobalEventHandler().addListener(InstanceChunkUnloadEvent.class, event -> {
@@ -111,17 +82,6 @@ public class MinestomTerraHandler {
                 return false;
             }
         });
-    }
-
-    private static boolean hasBlueConcrete(BlockAccess chunk) {
-        for (int y = MIN_Y; y <= MAX_Y; y++) {
-            for (int x = 0; x < 16; x++) {
-                for (int z = 0; z < 16; z++) {
-                    if (chunk.getBlockType(x, y, z) == BLOCK_BLUE_CONCRETE) return true;
-                }
-            }
-        }
-        return false;
     }
 
     /** Minestom implementation of BlockAccess - reads/writes blocks directly via the Instance. */
@@ -167,18 +127,8 @@ public class MinestomTerraHandler {
         }
 
         @Override
-        public boolean isSolid(int localX, int y, int localZ) {
-            return instance.getBlock(worldX(localX), y, worldZ(localZ)).isSolid();
-        }
-
-        @Override
-        public boolean isWaterAtWorld(int worldX, int y, int worldZ) {
-            return instance.getBlock(worldX, y, worldZ).compare(Block.WATER);
-        }
-
-        @Override
-        public boolean isBubbleColumnAtWorld(int worldX, int y, int worldZ) {
-            return instance.getBlock(worldX, y, worldZ).compare(Block.BUBBLE_COLUMN);
+        public int getBlockTypeAtWorld(int worldX, int y, int worldZ) {
+            return blockToType(instance.getBlock(worldX, y, worldZ));
         }
 
         @Override public int getChunkX() { return chunkX; }
@@ -187,10 +137,8 @@ public class MinestomTerraHandler {
         private static int blockToType(Block block) {
             if (block.compare(Block.WATER)) return BLOCK_WATER;
             if (block.compare(Block.BUBBLE_COLUMN)) return BLOCK_BUBBLE_COLUMN;
-            if (block.compare(Block.BLUE_CONCRETE)) return BLOCK_BLUE_CONCRETE;
             if (block.compare(Block.SOUL_SAND)) return BLOCK_SOUL_SAND;
             if (block.compare(Block.BEDROCK)) return BLOCK_BEDROCK;
-            if (block.compare(Block.CHEST)) return BLOCK_CHEST;
             if (block.isAir()) return BLOCK_AIR;
             return BLOCK_OTHER;
         }
@@ -199,10 +147,8 @@ public class MinestomTerraHandler {
             return switch (type) {
                 case BLOCK_WATER -> Block.WATER;
                 case BLOCK_BUBBLE_COLUMN -> Block.BUBBLE_COLUMN;
-                case BLOCK_BLUE_CONCRETE -> Block.BLUE_CONCRETE;
                 case BLOCK_SOUL_SAND -> Block.SOUL_SAND;
                 case BLOCK_BEDROCK -> Block.BEDROCK;
-                case BLOCK_CHEST -> Block.CHEST;
                 default -> Block.AIR;
             };
         }

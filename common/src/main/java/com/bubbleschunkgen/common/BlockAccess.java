@@ -16,14 +16,8 @@ public interface BlockAccess {
 
     void setWaterLevel(int localX, int y, int localZ, int level, boolean physics);
 
-    /** Check if a block is solid (for chest placement validation). */
-    boolean isSolid(int localX, int y, int localZ);
-
-    /** World-coordinate water check for cross-chunk neighbor lookups. */
-    boolean isWaterAtWorld(int worldX, int y, int worldZ);
-
-    /** World-coordinate bubble column check for cross-chunk neighbor lookups. */
-    boolean isBubbleColumnAtWorld(int worldX, int y, int worldZ);
+    /** World-coordinate block-type lookup for cross-chunk neighbor checks. Returns a BLOCK_* constant. */
+    int getBlockTypeAtWorld(int worldX, int y, int worldZ);
 
     /** Get chunk X coordinate in world. */
     int getChunkX();
