@@ -25,6 +25,11 @@ jobs:
       - name: Build all platforms
         run: chmod +x ./gradlew && ./gradlew build
 
+      - name: Test and build Bedrock add-on
+        run: |
+          node --test bedrock/test/core.test.mjs
+          bash bedrock/build.sh
+
       - name: Publish Terra addon to Repsy
         if: github.event_name == 'push'
         run: ./gradlew :terra-addon:publish
@@ -39,3 +44,4 @@ jobs:
           path: |
             bukkit/build/libs/BubblesOnChunkGen-Bukkit-*.jar
             terra-addon/build/libs/BubblesOnChunkGen-TerraAddon-*.jar
+            bedrock/build/BubblesOnChunkGen-Bedrock-*.mcaddon

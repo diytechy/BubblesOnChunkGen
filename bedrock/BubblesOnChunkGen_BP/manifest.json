@@ -1,0 +1,38 @@
+{
+  "format_version": 2,
+  "header": {
+    "name": "BubblesOnChunkGen",
+    "description": "Keeps CHIMERA river-lift bubble columns from leaking: protects soul sand and walls off level-1 water above it. Bedrock port of the BubblesOnChunkGen Terra addon.",
+    "uuid": "68b6b51b-bda1-462e-a0f4-5ed999970a8a",
+    "version": [1, 26, 2],
+    "min_engine_version": [1, 21, 90]
+  },
+  "modules": [
+    {
+      "type": "data",
+      "uuid": "296ef59b-88bf-4597-bbf7-3d14b7c954d8",
+      "version": [1, 26, 2]
+    },
+    {
+      "type": "script",
+      "language": "javascript",
+      "entry": "scripts/main.js",
+      "uuid": "bd2e0b52-9dd5-4dad-a9e8-5b0adee413d6",
+      "version": [1, 26, 2]
+    }
+  ],
+  "dependencies": [
+    {
+      "module_name": "@minecraft/server",
+      "version": "2.0.0"
+    },
+    {
+      "uuid": "c025c15b-a2f9-4a48-a5d9-58f5cb1df51e",
+      "version": [1, 26, 2]
+    }
+  ],
+  "metadata": {
+    "authors": ["BubblesOnChunkGen Contributors"],
+    "license": "MIT"
+  }
+}

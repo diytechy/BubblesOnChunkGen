@@ -64,3 +64,6 @@ The Terra-addon JAR is a single artifact, safe to install on Fabric/NeoForge ser
 **As a standalone Bukkit plugin** (no Terra)
 - Paper 1.21+
 - Some other source of soul sand + bedrock signatures under water
+
+**As a Bedrock Edition add-on** (for a Java-built map converted to Bedrock)
+- `bedrock/` contains a native behavior + resource pack (`.mcaddon`) that protects the soul sand and freezes the level-1 water above it. Bedrock has no cancellable flow event, so it walls the water in with an invisible, collision-less custom block instead. Minecraft Bedrock 1.21.90+. Read [bedrock/README.md](bedrock/README.md) for the differences and the uninstall step.
